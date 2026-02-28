@@ -160,4 +160,22 @@ public class Renderer {
             if (m != null) m.cleanup();
         }
     }
+    public void onBreakBlock() {
+        var hit = VoxelRaycast.raycast(chunkManager, camera.getPosition(), camera.getForward(), 6f);
+        if (hit == null) return;
+
+        chunkManager.setBlock(hit.x(), hit.y(), hit.z(), BlockType.AIR);
+    }
+
+    public void onPlaceBlock() {
+        var hit = VoxelRaycast.raycast(chunkManager, camera.getPosition(), camera.getForward(), 6f);
+        if (hit == null) return;
+
+        int px = hit.x() + hit.nx();
+        int py = hit.y() + hit.ny();
+        int pz = hit.z() + hit.nz();
+
+        // choose what block to place for now
+        chunkManager.setBlock(px, py, pz, BlockType.DIRT);
+    }
 }

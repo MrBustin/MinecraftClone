@@ -28,14 +28,27 @@ public class Game {
         double lastMouseY = 0;
         boolean firstMouse = true;
 
+        boolean lastLeft = false;
+        boolean lastRight = false;
+
         while (!window.shouldClose()) {
+
+            // ---- Mouse Clicks (edge-triggered) ----
+            boolean mouseLeft = glfwGetMouseButton(window.handle(), GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS;
+            boolean mouseRight = glfwGetMouseButton(window.handle(), GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS;
+
+            if (mouseLeft && !lastLeft) renderer.onBreakBlock();
+            if (mouseRight && !lastRight) renderer.onPlaceBlock();
+
+            lastLeft = mouseLeft;
+            lastRight = mouseRight;
 
             // ---- Delta Time ----
             double now = glfwGetTime();
             float dt = (float) (now - lastTime);
             lastTime = now;
 
-            // ---- Mouse Input ----
+            // ---- Mouse Look ----
             double[] xPos = new double[1];
             double[] yPos = new double[1];
             glfwGetCursorPos(window.handle(), xPos, yPos);
@@ -54,7 +67,7 @@ public class Game {
 
             renderer.getCamera().processMouse(dx, dy);
 
-            // ---- Keyboard Input ----
+            // ---- Keyboard Movement ----
             boolean forward  = glfwGetKey(window.handle(), GLFW_KEY_W) == GLFW_PRESS;
             boolean backward = glfwGetKey(window.handle(), GLFW_KEY_S) == GLFW_PRESS;
             boolean left     = glfwGetKey(window.handle(), GLFW_KEY_A) == GLFW_PRESS;
@@ -62,12 +75,10 @@ public class Game {
 
             renderer.getCamera().processKeyboard(forward, backward, left, right, dt);
 
-            // Optional: ESC to quit
             if (glfwGetKey(window.handle(), GLFW_KEY_ESCAPE) == GLFW_PRESS) {
                 glfwSetWindowShouldClose(window.handle(), true);
             }
 
-            // ---- Render ----
             renderer.beginFrame();
             renderer.endFrame(window);
         }

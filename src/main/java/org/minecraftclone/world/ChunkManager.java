@@ -141,4 +141,28 @@ public class ChunkManager {
 
         return unloadedKeys;
     }
+
+    public void setBlock(int wx, int wy, int wz, BlockType type) {
+        int cx = floorDiv(wx, Chunk.SIZE);
+        int cz = floorDiv(wz, Chunk.SIZE);
+
+        int lx = mod(wx, Chunk.SIZE);
+        int lz = mod(wz, Chunk.SIZE);
+
+        Chunk c = getOrCreate(cx, cz);
+        c.set(lx, wy, lz, type);
+
+        // if we changed a block on a chunk edge, neighbor chunk mesh may need rebuild too
+        if (lx == 0) markDirtyIfLoaded(cx - 1, cz);
+        if (lx == Chunk.SIZE - 1) markDirtyIfLoaded(cx + 1, cz);
+        if (lz == 0) markDirtyIfLoaded(cx, cz - 1);
+        if (lz == Chunk.SIZE - 1) markDirtyIfLoaded(cx, cz + 1);
+    }
+
+    private void markDirtyIfLoaded(int cx, int cz) {
+        Chunk n = getIfLoaded(cx, cz);
+        if (n != null) {
+            n.markDirty();
+        }
+    }
 }

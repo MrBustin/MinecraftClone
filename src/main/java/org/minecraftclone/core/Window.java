@@ -1,10 +1,9 @@
 package org.minecraftclone.core;
 
-import org.lwjgl.glfw.GLFWErrorCallback;
+
+import org.lwjgl.glfw.GLFWVidMode;
 
 import static org.lwjgl.glfw.GLFW.*;
-import static org.lwjgl.opengl.GL11.glClearColor;
-import static org.lwjgl.system.MemoryUtil.NULL;
 
 public class Window {
     private final int width;
@@ -19,16 +18,32 @@ public class Window {
     }
 
     public void init() {
-        GLFWErrorCallback.createPrint(System.err).set();
-        if (!glfwInit()) throw new IllegalStateException("Unable to initialize GLFW");
+        if (!glfwInit()) {
+            throw new IllegalStateException("Unable to initialize GLFW");
+        }
 
-        glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-        glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
-        glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-        glfwWindowHint(GLFW_VISIBLE, GLFW_TRUE);
+        // Configure hints BEFORE creating the window
+        glfwDefaultWindowHints();
+        glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
+        glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
 
-        handle = glfwCreateWindow(width, height, title, NULL, NULL);
-        if (handle == NULL) throw new RuntimeException("Failed to create window");
+        // --- Fullscreen setup ---
+        long monitor = glfwGetPrimaryMonitor();
+        if (monitor == 0L) {
+            throw new IllegalStateException("No primary monitor found (GLFW not initialized?)");
+        }
+
+        GLFWVidMode vid = glfwGetVideoMode(monitor);
+        if (vid == null) {
+            throw new IllegalStateException("Could not get video mode for monitor");
+        }
+
+        // TRUE fullscreen
+        handle = glfwCreateWindow(vid.width(), vid.height(), title, monitor, 0L);
+
+        if (handle == 0L) {
+            throw new RuntimeException("Failed to create GLFW window");
+        }
 
         glfwMakeContextCurrent(handle);
         glfwSwapInterval(1); // vsync

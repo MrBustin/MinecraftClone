@@ -47,7 +47,7 @@ public class Camera {
     public void processKeyboard(boolean forward, boolean backward,
                                 boolean left, boolean right, float dt) {
 
-        float speed = 3.5f * dt;
+        float speed = 10.5f * dt;
 
         Vector3f rightVec = new Vector3f(front).cross(up).normalize();
 
@@ -55,5 +55,13 @@ public class Camera {
         if (backward) position.sub(new Vector3f(front).mul(speed));
         if (left) position.sub(new Vector3f(rightVec).mul(speed));
         if (right) position.add(new Vector3f(rightVec).mul(speed));
+    }
+
+    public org.joml.Vector3f getPosition() {
+        return new org.joml.Vector3f(position);
+    }
+
+    public org.joml.Vector3f getForward() {
+        return new org.joml.Vector3f(front);
     }
 }

@@ -35,4 +35,5 @@ public class Chunk {
 
     public boolean isDirty() { return dirty; }
     public void clearDirty() { dirty = false; }
+    public void markDirty() { dirty = true; }
 }
