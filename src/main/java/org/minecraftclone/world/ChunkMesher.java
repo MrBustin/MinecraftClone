@@ -24,16 +24,37 @@ public final class ChunkMesher {
                     int wx = baseX + x;
                     int wz = baseZ + z;
 
-                    float[] uv = uvFor(t);
-                    float u0 = uv[0], v0 = uv[1], u1 = uv[2], v1 = uv[3];
 
                     // For each face: if neighbor is AIR, add that face
-                    if (world.getBlockIfLoaded(wx, y, wz + 1) == BlockType.AIR) addFront(out, x, y, z, u0, v0, u1, v1);
-                    if (world.getBlockIfLoaded(wx, y, wz - 1) == BlockType.AIR) addBack(out, x, y, z, u0, v0, u1, v1);
-                    if (world.getBlockIfLoaded(wx - 1, y, wz) == BlockType.AIR) addLeft(out, x, y, z, u0, v0, u1, v1);
-                    if (world.getBlockIfLoaded(wx + 1, y, wz) == BlockType.AIR) addRight(out, x, y, z, u0, v0, u1, v1);
-                    if (world.getBlockIfLoaded(wx, y + 1, wz) == BlockType.AIR) addTop(out, x, y, z, u0, v0, u1, v1);
-                    if (world.getBlockIfLoaded(wx, y - 1, wz) == BlockType.AIR) addBottom(out, x, y, z, u0, v0, u1, v1);
+                    if (world.getBlockIfLoaded(wx, y, wz + 1) == BlockType.AIR) {
+                        float[] uv = uvFor(t, Face.FRONT);
+                        addFront(out, x, y, z, uv[0], uv[1], uv[2], uv[3]);
+                    }
+
+                    if (world.getBlockIfLoaded(wx, y, wz - 1) == BlockType.AIR) {
+                        float[] uv = uvFor(t, Face.BACK);
+                        addBack(out, x, y, z, uv[0], uv[1], uv[2], uv[3]);
+                    }
+
+                    if (world.getBlockIfLoaded(wx - 1, y, wz) == BlockType.AIR) {
+                        float[] uv = uvFor(t, Face.LEFT);
+                        addLeft(out, x, y, z, uv[0], uv[1], uv[2], uv[3]);
+                    }
+
+                    if (world.getBlockIfLoaded(wx + 1, y, wz) == BlockType.AIR) {
+                        float[] uv = uvFor(t, Face.RIGHT);
+                        addRight(out, x, y, z, uv[0], uv[1], uv[2], uv[3]);
+                    }
+
+                    if (world.getBlockIfLoaded(wx, y + 1, wz) == BlockType.AIR) {
+                        float[] uv = uvFor(t, Face.TOP);
+                        addTop(out, x, y, z, uv[0], uv[1], uv[2], uv[3]);
+                    }
+
+                    if (world.getBlockIfLoaded(wx, y - 1, wz) == BlockType.AIR) {
+                        float[] uv = uvFor(t, Face.BOTTOM);
+                        addBottom(out, x, y, z, uv[0], uv[1], uv[2], uv[3]);
+                    }
                 }
             }
         }
@@ -41,27 +62,36 @@ public final class ChunkMesher {
         return out.toArray();
     }
 
-    private static float[] uvFor(BlockType t) {
-
+    private static float[] uvFor(BlockType t, Face face) {
         int tilesX = 16;
         int tilesY = 16;
 
-        // choose tile coordinates in atlas grid
-        int tileX = switch (t) {
-            case DIRT -> 0;     // column
-            case STONE -> 1;    // column
-            default -> 0;
-        };
+        int tileX, tileY;
 
-        int tileY = 0; // row (0 = top row in our system for now)
+        // Choose atlas tile based on block + face
+        switch (t) {
+            case DIRT -> { tileX = 0; tileY = 0; }
+            case STONE -> { tileX = 1; tileY = 0; }
 
-        float tileWidth  = 1.0f / tilesX;
-        float tileHeight = 1.0f / tilesY;
+            case GRASS -> {
+                // bottom uses dirt
+                if (face == Face.BOTTOM) { tileX = 0; tileY = 0; }
+                // top uses grass top
+                else if (face == Face.TOP) { tileX = 3; tileY = 0; }
+                // sides use grass side
+                else { tileX = 2; tileY = 0; }
+            }
 
-        float u0 = tileX * tileWidth;
-        float v0 = tileY * tileHeight;
-        float u1 = u0 + tileWidth;
-        float v1 = v0 + tileHeight;
+            default -> { tileX = 0; tileY = 0; }
+        }
+
+        float tw = 1.0f / tilesX;
+        float th = 1.0f / tilesY;
+
+        float u0 = tileX * tw;
+        float v0 = tileY * th;
+        float u1 = u0 + tw;
+        float v1 = v0 + th;
 
         return new float[]{u0, v0, u1, v1};
     }

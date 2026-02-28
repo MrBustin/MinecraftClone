@@ -17,6 +17,8 @@ public class Renderer {
     private Texture texture;
     private ChunkManager chunkManager;
     private java.util.Map<Long, Mesh> chunkMeshes = new java.util.HashMap<>();
+    private static final int VIEW_DISTANCE = 6;   // chunks
+    private int frameCounter = 0;
 
     private static final String VERT = """
         #version 330 core
@@ -47,7 +49,7 @@ public class Renderer {
         GL.createCapabilities();
         world = new World(16, 8, 16);
         glEnable(GL_DEPTH_TEST);
-        glClearColor(0.1f, 0.12f, 0.15f, 1.0f);
+        glClearColor(0.545f, 0.545f, 1.0f, 1.0f);
 
         shader = new ShaderProgram(VERT, FRAG);
         texture = new Texture("/textures/atlas.png");
@@ -73,6 +75,7 @@ public class Renderer {
     }
 
     public void beginFrame() {
+        updateChunkStreaming();
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         shader.bind();
@@ -85,7 +88,7 @@ public class Renderer {
         glActiveTexture(GL_TEXTURE0);
         texture.bind();
 
-        for (Chunk c : chunkManager.loadedChunks()) {
+        for (Chunk c : chunkManager.loadedChunksSnapshot()) {
             if (c.isDirty() || !chunkMeshes.containsKey(new ChunkPos(c.cx(), c.cz()).key())) {
                 float[] data = ChunkMesher.buildMesh(chunkManager, c);
 
@@ -128,5 +131,33 @@ public class Renderer {
 
     public Camera getCamera() {
         return camera;
+    }
+
+    private static int floorDiv(int a, int b) {
+        int r = a / b;
+        if ((a ^ b) < 0 && (r * b != a)) r--;
+        return r;
+    }
+
+    private void updateChunkStreaming() {
+        // Only update every ~10 frames (tune later)
+        frameCounter++;
+        if (frameCounter % 10 != 0) return;
+
+        int playerX = (int) Math.floor(camera.position.x);
+        int playerZ = (int) Math.floor(camera.position.z);
+
+        int centerCx = floorDiv(playerX, Chunk.SIZE);
+        int centerCz = floorDiv(playerZ, Chunk.SIZE);
+
+        // Load around player
+        chunkManager.ensureLoadedAround(centerCx, centerCz, VIEW_DISTANCE);
+
+        // Unload far chunks, and free their meshes
+        java.util.List<Long> unloaded = chunkManager.unloadOutsideRadius(centerCx, centerCz, VIEW_DISTANCE);
+        for (long key : unloaded) {
+            Mesh m = chunkMeshes.remove(key);
+            if (m != null) m.cleanup();
+        }
     }
 }

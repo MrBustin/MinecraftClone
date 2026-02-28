@@ -28,6 +28,7 @@ public final class Mesh {
         fb.put(data).flip();
         glBufferData(GL_ARRAY_BUFFER, fb, GL_STATIC_DRAW);
         MemoryUtil.memFree(fb);
+        glPolygonMode(GL_FRONT_AND_BACK, GL_FOG_MODE);
 
         int stride = 5 * Float.BYTES;
 
