@@ -5,7 +5,7 @@ import org.joml.Vector3f;
 
 public class Camera {
 
-    public Vector3f position = new Vector3f(0, 10, 3);
+    public Vector3f position = new Vector3f(0, 80, 3);
 
     private float yaw = -90f;   // looking toward -Z
     private float pitch = 0f;
