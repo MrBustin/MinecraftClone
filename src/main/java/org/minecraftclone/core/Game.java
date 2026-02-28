@@ -79,7 +79,7 @@ public class Game {
                 glfwSetWindowShouldClose(window.handle(), true);
             }
 
-            renderer.beginFrame();
+            renderer.beginFrame(window);
             renderer.endFrame(window);
         }
     }

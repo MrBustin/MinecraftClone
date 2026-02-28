@@ -1,15 +1,14 @@
 package org.minecraftclone.world;
 
-
 import org.minecraftclone.gfx.FloatList;
 
 public final class ChunkMesher {
 
-    // Each face is 2 triangles = 6 vertices. Each vertex: x y z u v
-    // UVs are 0..1 for now (later you’ll map into an atlas)
+    public record ChunkMeshData(float[] solid, float[] water) {}
 
-    public static float[] buildMesh(ChunkManager world, Chunk chunk) {
-        FloatList out = new FloatList();
+    public static ChunkMeshData buildMesh(ChunkManager world, Chunk chunk) {
+        FloatList solid = new FloatList();
+        FloatList water = new FloatList();
 
         int baseX = chunk.cx() * Chunk.SIZE;
         int baseZ = chunk.cz() * Chunk.SIZE;
@@ -24,42 +23,61 @@ public final class ChunkMesher {
                     int wx = baseX + x;
                     int wz = baseZ + z;
 
+                    // choose which mesh we append to
+                    FloatList target = (t == BlockType.WATER) ? water : solid;
 
-                    // For each face: if neighbor is AIR, add that face
-                    if (world.getBlockIfLoaded(wx, y, wz + 1) == BlockType.AIR) {
+                    // For solids: face visible if neighbor is AIR
+                    // For water: face visible if neighbor is AIR (not water), so water merges into one volume
+                    // (Later: you can also render water faces against solids for shoreline – this already does.)
+                    BlockType nFront  = world.getBlockForMeshing(wx, y, wz + 1);
+                    BlockType nBack   = world.getBlockForMeshing(wx, y, wz - 1);
+                    BlockType nLeft   = world.getBlockForMeshing(wx - 1, y, wz);
+                    BlockType nRight  = world.getBlockForMeshing(wx + 1, y, wz);
+                    BlockType nTop    = world.getBlockForMeshing(wx, y + 1, wz);
+                    BlockType nBottom = world.getBlockForMeshing(wx, y - 1, wz);
+
+                    if (isFaceVisible(t, nFront)) {
                         float[] uv = uvFor(t, Face.FRONT);
-                        addFront(out, x, y, z, uv[0], uv[1], uv[2], uv[3]);
+                        addFront(target, x, y, z, uv[0], uv[1], uv[2], uv[3]);
                     }
-
-                    if (world.getBlockIfLoaded(wx, y, wz - 1) == BlockType.AIR) {
+                    if (isFaceVisible(t, nBack)) {
                         float[] uv = uvFor(t, Face.BACK);
-                        addBack(out, x, y, z, uv[0], uv[1], uv[2], uv[3]);
+                        addBack(target, x, y, z, uv[0], uv[1], uv[2], uv[3]);
                     }
-
-                    if (world.getBlockIfLoaded(wx - 1, y, wz) == BlockType.AIR) {
+                    if (isFaceVisible(t, nLeft)) {
                         float[] uv = uvFor(t, Face.LEFT);
-                        addLeft(out, x, y, z, uv[0], uv[1], uv[2], uv[3]);
+                        addLeft(target, x, y, z, uv[0], uv[1], uv[2], uv[3]);
                     }
-
-                    if (world.getBlockIfLoaded(wx + 1, y, wz) == BlockType.AIR) {
+                    if (isFaceVisible(t, nRight)) {
                         float[] uv = uvFor(t, Face.RIGHT);
-                        addRight(out, x, y, z, uv[0], uv[1], uv[2], uv[3]);
+                        addRight(target, x, y, z, uv[0], uv[1], uv[2], uv[3]);
                     }
-
-                    if (world.getBlockIfLoaded(wx, y + 1, wz) == BlockType.AIR) {
+                    if (isFaceVisible(t, nTop)) {
                         float[] uv = uvFor(t, Face.TOP);
-                        addTop(out, x, y, z, uv[0], uv[1], uv[2], uv[3]);
+                        addTop(target, x, y, z, uv[0], uv[1], uv[2], uv[3]);
                     }
-
-                    if (world.getBlockIfLoaded(wx, y - 1, wz) == BlockType.AIR) {
+                    if (isFaceVisible(t, nBottom)) {
                         float[] uv = uvFor(t, Face.BOTTOM);
-                        addBottom(out, x, y, z, uv[0], uv[1], uv[2], uv[3]);
+                        addBottom(target, x, y, z, uv[0], uv[1], uv[2], uv[3]);
                     }
                 }
             }
         }
 
-        return out.toArray();
+        return new ChunkMeshData(solid.toArray(), water.toArray());
+    }
+
+    private static boolean isTransparent(BlockType t) {
+        return t == BlockType.AIR || t == BlockType.WATER;
+    }
+
+    private static boolean isFaceVisible(BlockType self, BlockType neighbor) {
+        if (self == BlockType.WATER) {
+            // water faces render against anything except water (merges water volumes)
+            return neighbor == BlockType.AIR;
+        }
+        // solid faces render against transparent neighbors (air OR water)
+        return isTransparent(neighbor);
     }
 
     private static float[] uvFor(BlockType t, Face face) {
@@ -68,18 +86,16 @@ public final class ChunkMesher {
 
         int tileX, tileY;
 
-        // Choose atlas tile based on block + face
         switch (t) {
-            case DIRT -> { tileX = 0; tileY = 0; }
+            case DIRT  -> { tileX = 0; tileY = 0; }
             case STONE -> { tileX = 1; tileY = 0; }
+            case SAND  -> { tileX = 4; tileY = 0; }
+            case WATER -> { tileX = 0; tileY = 1; }
 
             case GRASS -> {
-                // bottom uses dirt
-                if (face == Face.BOTTOM) { tileX = 0; tileY = 0; }
-                // top uses grass top
-                else if (face == Face.TOP) { tileX = 3; tileY = 0; }
-                // sides use grass side
-                else { tileX = 2; tileY = 0; }
+                if (face == Face.BOTTOM) { tileX = 0; tileY = 0; }      // dirt bottom
+                else if (face == Face.TOP) { tileX = 3; tileY = 0; }    // grass top
+                else { tileX = 2; tileY = 0; }                          // grass side
             }
 
             default -> { tileX = 0; tileY = 0; }
@@ -100,39 +116,32 @@ public final class ChunkMesher {
         o.add(x); o.add(y); o.add(z); o.add(u); o.add(v);
     }
 
-// These faces are for a cube from (x,y,z) to (x+1,y+1,z+1)
-
-    private static void addFront(FloatList o, int x, int y, int z, float u0, float v0, float u1, float v1) { // +Z
+    private static void addFront(FloatList o, int x, int y, int z, float u0, float v0, float u1, float v1) {
         float x0=x, x1=x+1, y0=y, y1=y+1, z1=z+1;
         v(o,x0,y0,z1, u0,v0); v(o,x1,y0,z1, u1,v0); v(o,x1,y1,z1, u1,v1);
         v(o,x1,y1,z1, u1,v1); v(o,x0,y1,z1, u0,v1); v(o,x0,y0,z1, u0,v0);
     }
-
-    private static void addBack(FloatList o, int x, int y, int z, float u0, float v0, float u1, float v1) { // -Z
+    private static void addBack(FloatList o, int x, int y, int z, float u0, float v0, float u1, float v1) {
         float x0=x, x1=x+1, y0=y, y1=y+1, z0=z;
         v(o,x1,y0,z0, u0,v0); v(o,x0,y0,z0, u1,v0); v(o,x0,y1,z0, u1,v1);
         v(o,x0,y1,z0, u1,v1); v(o,x1,y1,z0, u0,v1); v(o,x1,y0,z0, u0,v0);
     }
-
-    private static void addLeft(FloatList o, int x, int y, int z, float u0, float v0, float u1, float v1) { // -X
+    private static void addLeft(FloatList o, int x, int y, int z, float u0, float v0, float u1, float v1) {
         float x0=x, y0=y, y1=y+1, z0=z, z1=z+1;
         v(o,x0,y0,z0, u0,v0); v(o,x0,y0,z1, u1,v0); v(o,x0,y1,z1, u1,v1);
         v(o,x0,y1,z1, u1,v1); v(o,x0,y1,z0, u0,v1); v(o,x0,y0,z0, u0,v0);
     }
-
-    private static void addRight(FloatList o, int x, int y, int z, float u0, float v0, float u1, float v1) { // +X
+    private static void addRight(FloatList o, int x, int y, int z, float u0, float v0, float u1, float v1) {
         float x1=x+1, y0=y, y1=y+1, z0=z, z1=z+1;
         v(o,x1,y0,z1, u0,v0); v(o,x1,y0,z0, u1,v0); v(o,x1,y1,z0, u1,v1);
         v(o,x1,y1,z0, u1,v1); v(o,x1,y1,z1, u0,v1); v(o,x1,y0,z1, u0,v0);
     }
-
-    private static void addTop(FloatList o, int x, int y, int z, float u0, float v0, float u1, float v1) { // +Y
+    private static void addTop(FloatList o, int x, int y, int z, float u0, float v0, float u1, float v1) {
         float x0=x, x1=x+1, y1=y+1, z0=z, z1=z+1;
         v(o,x0,y1,z1, u0,v0); v(o,x1,y1,z1, u1,v0); v(o,x1,y1,z0, u1,v1);
         v(o,x1,y1,z0, u1,v1); v(o,x0,y1,z0, u0,v1); v(o,x0,y1,z1, u0,v0);
     }
-
-    private static void addBottom(FloatList o, int x, int y, int z, float u0, float v0, float u1, float v1) { // -Y
+    private static void addBottom(FloatList o, int x, int y, int z, float u0, float v0, float u1, float v1) {
         float x0=x, x1=x+1, y0=y, z0=z, z1=z+1;
         v(o,x0,y0,z0, u0,v0); v(o,x1,y0,z0, u1,v0); v(o,x1,y0,z1, u1,v1);
         v(o,x1,y0,z1, u1,v1); v(o,x0,y0,z1, u0,v1); v(o,x0,y0,z0, u0,v0);

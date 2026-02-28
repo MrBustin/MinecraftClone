@@ -4,5 +4,7 @@ public enum BlockType {
     AIR,
     DIRT,
     STONE,
-    GRASS
+    GRASS,
+    SAND,
+    WATER
 }

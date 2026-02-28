@@ -1,24 +1,35 @@
 package org.minecraftclone.core;
 
 import org.joml.Matrix4f;
+import org.lwjgl.glfw.GLFWVidMode;
 import org.lwjgl.opengl.GL;
+import org.lwjgl.stb.STBEasyFont;
+import org.lwjgl.system.MemoryUtil;
 import org.minecraftclone.gfx.*;
 import org.minecraftclone.world.*;
+
+import java.util.HashMap;
+import java.util.Map;
 
 import static org.lwjgl.glfw.GLFW.*;
 import static org.lwjgl.opengl.GL33.*;
 
 public class Renderer {
     private ShaderProgram shader;
-    private Mesh triangle;
     private Camera camera;
     private Matrix4f projection;
-    private World world;
     private Texture texture;
     private ChunkManager chunkManager;
-    private java.util.Map<Long, Mesh> chunkMeshes = new java.util.HashMap<>();
-    private static final int VIEW_DISTANCE = 6;   // chunks
+
+    private Map<Long, ChunkRenderData> chunkMeshes = new HashMap<>();
+    private static final int VIEW_DISTANCE = 12;   // chunks
     private int frameCounter = 0;
+
+    private int fps;
+    private int frames;
+    private double fpsTimer;
+
+    private static final int REMESH_BUDGET_PER_FRAME = 4; // start with 2-4
 
     private static final String VERT = """
         #version 330 core
@@ -45,37 +56,57 @@ public class Renderer {
             FragColor = texture(uTex, vUV);
         }
         """;
+
+    private static class ChunkRenderData {
+        Mesh solid;
+        Mesh water;
+    }
+
     public void init() {
         GL.createCapabilities();
-        world = new World(16, 8, 16);
+
         glEnable(GL_DEPTH_TEST);
         glClearColor(0.545f, 0.545f, 1.0f, 1.0f);
+
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
         shader = new ShaderProgram(VERT, FRAG);
         texture = new Texture("/textures/atlas.png");
 
         camera = new Camera();
+
+        // depth precision fix: raise near plane a bit (helps your huge terrain)
         projection = new Matrix4f().perspective(
                 (float) Math.toRadians(70.0),
                 1280f / 720f,
-                0.1f,
+                0.5f,
                 1000f
         );
 
         chunkManager = new ChunkManager();
 
-// preload a small area for testing
+        // preload a small area for testing
         for (int cx = -1; cx <= 1; cx++) {
             for (int cz = -1; cz <= 1; cz++) {
                 chunkManager.getOrCreate(cx, cz);
             }
         }
-
-        triangle = new Mesh(Primitives.cubePUV());
     }
 
-    public void beginFrame() {
+    public void beginFrame(Window window) {
+
+        double now = glfwGetTime();
+        frames++;
+
+        if (now - fpsTimer >= 1.0) {
+            fps = frames;
+            frames = 0;
+            fpsTimer = now;
+        }
+
         updateChunkStreaming();
+
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         shader.bind();
@@ -83,37 +114,69 @@ public class Renderer {
         Matrix4f view = camera.getViewMatrix();
         Matrix4f vp = new Matrix4f(projection).mul(view);
 
-
-
         glActiveTexture(GL_TEXTURE0);
         texture.bind();
 
+        // rebuild meshes if needed
+        int remeshed = 0;
+
         for (Chunk c : chunkManager.loadedChunksSnapshot()) {
-            if (c.isDirty() || !chunkMeshes.containsKey(new ChunkPos(c.cx(), c.cz()).key())) {
-                float[] data = ChunkMesher.buildMesh(chunkManager, c);
-
-                // rebuild mesh
-                long key = new ChunkPos(c.cx(), c.cz()).key();
-                Mesh old = chunkMeshes.get(key);
-                if (old != null) old.cleanup();
-
-                chunkMeshes.put(key, new Mesh(data));
-                c.clearDirty();
-            }
-
-            // Draw the mesh with chunk offset
+            if (remeshed >= REMESH_BUDGET_PER_FRAME) break;
             long key = new ChunkPos(c.cx(), c.cz()).key();
-            Mesh mesh = chunkMeshes.get(key);
-            if (mesh == null) continue;
+            if (c.isDirty() || !chunkMeshes.containsKey(key)) {
+
+                ChunkMesher.ChunkMeshData data = ChunkMesher.buildMesh(chunkManager, c);
+
+                ChunkRenderData old = chunkMeshes.get(key);
+                if (old != null) {
+                    if (old.solid != null) old.solid.cleanup();
+                    if (old.water != null) old.water.cleanup();
+                }
+
+                ChunkRenderData rd = new ChunkRenderData();
+                if (data.solid().length > 0) rd.solid = new Mesh(data.solid());
+                if (data.water().length > 0) rd.water = new Mesh(data.water());
+
+                chunkMeshes.put(key, rd);
+                c.clearDirty();
+                remeshed++;
+            }
+        }
+
+        // ---- PASS 1: SOLIDS ----
+        glDepthMask(true);
+
+        for (Chunk c : chunkManager.loadedChunksSnapshot()) {
+            long key = new ChunkPos(c.cx(), c.cz()).key();
+            ChunkRenderData rd = chunkMeshes.get(key);
+            if (rd == null || rd.solid == null) continue;
 
             Matrix4f model = new Matrix4f().translate(c.cx() * Chunk.SIZE, 0, c.cz() * Chunk.SIZE);
             Matrix4f mvp = new Matrix4f(vp).mul(model);
 
             shader.setMat4("uMVP", mvp);
-            mesh.draw();
+            rd.solid.draw();
         }
 
+        // ---- PASS 2: WATER (transparent) ----
+        glDepthMask(false);
+
+        for (Chunk c : chunkManager.loadedChunksSnapshot()) {
+            long key = new ChunkPos(c.cx(), c.cz()).key();
+            ChunkRenderData rd = chunkMeshes.get(key);
+            if (rd == null || rd.water == null) continue;
+
+            Matrix4f model = new Matrix4f().translate(c.cx() * Chunk.SIZE, 0, c.cz() * Chunk.SIZE);
+            Matrix4f mvp = new Matrix4f(vp).mul(model);
+
+            shader.setMat4("uMVP", mvp);
+            rd.water.draw();
+        }
+
+        glDepthMask(true);
+
         shader.unbind();
+        renderFPS(window);
     }
 
     public void endFrame(Window window) {
@@ -122,10 +185,13 @@ public class Renderer {
     }
 
     public void cleanup() {
-        if (triangle != null) triangle.cleanup();
         if (shader != null) shader.cleanup();
         if (texture != null) texture.cleanup();
-        for (Mesh m : chunkMeshes.values()) m.cleanup();
+
+        for (ChunkRenderData rd : chunkMeshes.values()) {
+            if (rd.solid != null) rd.solid.cleanup();
+            if (rd.water != null) rd.water.cleanup();
+        }
         chunkMeshes.clear();
     }
 
@@ -140,7 +206,6 @@ public class Renderer {
     }
 
     private void updateChunkStreaming() {
-        // Only update every ~10 frames (tune later)
         frameCounter++;
         if (frameCounter % 10 != 0) return;
 
@@ -150,20 +215,21 @@ public class Renderer {
         int centerCx = floorDiv(playerX, Chunk.SIZE);
         int centerCz = floorDiv(playerZ, Chunk.SIZE);
 
-        // Load around player
         chunkManager.ensureLoadedAround(centerCx, centerCz, VIEW_DISTANCE);
 
-        // Unload far chunks, and free their meshes
-        java.util.List<Long> unloaded = chunkManager.unloadOutsideRadius(centerCx, centerCz, VIEW_DISTANCE);
+        var unloaded = chunkManager.unloadOutsideRadius(centerCx, centerCz, VIEW_DISTANCE);
         for (long key : unloaded) {
-            Mesh m = chunkMeshes.remove(key);
-            if (m != null) m.cleanup();
+            ChunkRenderData rd = chunkMeshes.remove(key);
+            if (rd != null) {
+                if (rd.solid != null) rd.solid.cleanup();
+                if (rd.water != null) rd.water.cleanup();
+            }
         }
     }
+
     public void onBreakBlock() {
         var hit = VoxelRaycast.raycast(chunkManager, camera.getPosition(), camera.getForward(), 6f);
         if (hit == null) return;
-
         chunkManager.setBlock(hit.x(), hit.y(), hit.z(), BlockType.AIR);
     }
 
@@ -175,7 +241,56 @@ public class Renderer {
         int py = hit.y() + hit.ny();
         int pz = hit.z() + hit.nz();
 
-        // choose what block to place for now
-        chunkManager.setBlock(px, py, pz, BlockType.DIRT);
+        chunkManager.setBlock(px, py, pz, BlockType.GRASS);
+    }
+
+    private void renderFPS(Window window) {
+        String text = "FPS: " + fps;
+
+        long monitor = glfwGetPrimaryMonitor();
+        GLFWVidMode vid = glfwGetVideoMode(monitor);
+        assert vid != null;
+        int width = vid.width();
+        int height = vid.height();
+
+        // STB buffer (each char ~270 bytes worst case)
+        var buffer = MemoryUtil.memAlloc(text.length() * 270);
+
+        int quads = STBEasyFont.stb_easy_font_print(
+                0, 0, text, null, buffer
+        );
+
+        // Switch to 2D orthographic projection
+        glUseProgram(0); // no shader
+
+        glMatrixMode(GL_PROJECTION);
+        glPushMatrix();
+        glLoadIdentity();
+        glOrtho(0, width, height, 0, -1, 1);
+
+        glMatrixMode(GL_MODELVIEW);
+        glPushMatrix();
+        glLoadIdentity();
+
+        glDisable(GL_DEPTH_TEST);
+
+        glColor3f(1f, 1f, 1f);
+
+        // Position top-right
+        glTranslatef(width - 120, 20, 0);
+
+        glEnableClientState(GL_VERTEX_ARRAY);
+        glVertexPointer(2, GL_FLOAT, 16, buffer);
+        glDrawArrays(GL_QUADS, 0, quads * 4);
+        glDisableClientState(GL_VERTEX_ARRAY);
+
+        glEnable(GL_DEPTH_TEST);
+
+        glPopMatrix();
+        glMatrixMode(GL_PROJECTION);
+        glPopMatrix();
+        glMatrixMode(GL_MODELVIEW);
+
+        MemoryUtil.memFree(buffer);
     }
 }
