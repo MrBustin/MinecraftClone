@@ -64,4 +64,8 @@ public class Camera {
     public org.joml.Vector3f getForward() {
         return new org.joml.Vector3f(front);
     }
+    public void setYawPitch(float yaw, float pitch) {
+        this.yaw = yaw;
+        this.pitch = pitch;
+    }
 }

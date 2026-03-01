@@ -62,6 +62,12 @@ public class Game {
             float dx = (float) (xPos[0] - lastMouseX);
             float dy = (float) (yPos[0] - lastMouseY);
 
+            float maxDelta = 50f; // tweak 20–80
+            if (dx >  maxDelta) dx =  maxDelta;
+            if (dx < -maxDelta) dx = -maxDelta;
+            if (dy >  maxDelta) dy =  maxDelta;
+            if (dy < -maxDelta) dy = -maxDelta;
+
             lastMouseX = xPos[0];
             lastMouseY = yPos[0];
 
@@ -73,7 +79,9 @@ public class Game {
             boolean left     = glfwGetKey(window.handle(), GLFW_KEY_A) == GLFW_PRESS;
             boolean right    = glfwGetKey(window.handle(), GLFW_KEY_D) == GLFW_PRESS;
 
+            boolean jump = glfwGetKey(window.handle(), GLFW_KEY_SPACE) == GLFW_PRESS;
             renderer.getCamera().processKeyboard(forward, backward, left, right, dt);
+            renderer.updatePlayer(dt, forward, backward, left, right, jump, dx, dy);
 
             if (glfwGetKey(window.handle(), GLFW_KEY_ESCAPE) == GLFW_PRESS) {
                 glfwSetWindowShouldClose(window.handle(), true);

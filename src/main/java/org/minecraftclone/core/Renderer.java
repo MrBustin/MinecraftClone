@@ -20,6 +20,7 @@ public class Renderer {
     private Matrix4f projection;
     private Texture texture;
     private ChunkManager chunkManager;
+    private Player player;
 
     private Map<Long, ChunkRenderData> chunkMeshes = new HashMap<>();
     private static final int VIEW_DISTANCE = 12;   // chunks
@@ -75,12 +76,14 @@ public class Renderer {
         texture = new Texture("/textures/atlas.png");
 
         camera = new Camera();
+        player = new Player();
+
 
         // depth precision fix: raise near plane a bit (helps your huge terrain)
         projection = new Matrix4f().perspective(
                 (float) Math.toRadians(70.0),
                 1280f / 720f,
-                0.5f,
+                0.05f,
                 1000f
         );
 
@@ -285,5 +288,20 @@ public class Renderer {
         glMatrixMode(GL_MODELVIEW);
 
         MemoryUtil.memFree(buffer);
+    }
+
+    public void updatePlayer(float dt, boolean forward, boolean back, boolean left, boolean right, boolean jump, float dx, float dy) {
+        // mouse look -> player yaw/pitch
+        float sensitivity = 0.12f;
+        player.yaw += dx * sensitivity;
+        player.pitch -= dy * sensitivity;
+        player.pitch = Math.max(-89f, Math.min(89f, player.pitch));
+
+        // update physics
+        player.update(chunkManager, dt, forward, back, left, right, jump);
+
+        // set camera to player eyes
+        camera.position.set(player.pos.x, player.pos.y + Player.EYE_HEIGHT, player.pos.z);
+        camera.setYawPitch(player.yaw, player.pitch);
     }
 }
