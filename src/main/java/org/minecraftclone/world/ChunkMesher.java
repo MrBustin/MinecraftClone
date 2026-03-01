@@ -24,11 +24,11 @@ public final class ChunkMesher {
                     int wz = baseZ + z;
 
                     // choose which mesh we append to
-                    FloatList target = (t == BlockType.WATER) ? water : solid;
+                    FloatList target =
+                            (t == BlockType.WATER) ? water : solid;
 
                     // For solids: face visible if neighbor is AIR
                     // For water: face visible if neighbor is AIR (not water), so water merges into one volume
-                    // (Later: you can also render water faces against solids for shoreline – this already does.)
                     BlockType nFront  = world.getBlockForMeshing(wx, y, wz + 1);
                     BlockType nBack   = world.getBlockForMeshing(wx, y, wz - 1);
                     BlockType nLeft   = world.getBlockForMeshing(wx - 1, y, wz);
@@ -73,7 +73,6 @@ public final class ChunkMesher {
 
     private static boolean isFaceVisible(BlockType self, BlockType neighbor) {
         if (self == BlockType.WATER) {
-            // water faces render against anything except water (merges water volumes)
             return neighbor == BlockType.AIR;
         }
         // solid faces render against transparent neighbors (air OR water)
@@ -87,15 +86,22 @@ public final class ChunkMesher {
         int tileX, tileY;
 
         switch (t) {
+            //Cube All
             case DIRT  -> { tileX = 0; tileY = 0; }
             case STONE -> { tileX = 1; tileY = 0; }
             case SAND  -> { tileX = 4; tileY = 0; }
             case WATER -> { tileX = 0; tileY = 1; }
+            case LEAVES -> {tileX = 1; tileY = 1;}
 
+            //Custom
             case GRASS -> {
                 if (face == Face.BOTTOM) { tileX = 0; tileY = 0; }      // dirt bottom
                 else if (face == Face.TOP) { tileX = 3; tileY = 0; }    // grass top
                 else { tileX = 2; tileY = 0; }                          // grass side
+            }
+            case LOG -> {
+                if (face == Face.BOTTOM || face == Face.TOP) { tileX = 6; tileY = 0; }      // log top and bottom
+                else { tileX = 5; tileY = 0; }                          // log side
             }
 
             default -> { tileX = 0; tileY = 0; }

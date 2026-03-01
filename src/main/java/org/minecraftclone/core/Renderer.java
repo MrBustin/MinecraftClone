@@ -85,13 +85,6 @@ public class Renderer {
         );
 
         chunkManager = new ChunkManager();
-
-        // preload a small area for testing
-        for (int cx = -1; cx <= 1; cx++) {
-            for (int cz = -1; cz <= 1; cz++) {
-                chunkManager.getOrCreate(cx, cz);
-            }
-        }
     }
 
     public void beginFrame(Window window) {
@@ -166,7 +159,7 @@ public class Renderer {
             ChunkRenderData rd = chunkMeshes.get(key);
             if (rd == null || rd.water == null) continue;
 
-            Matrix4f model = new Matrix4f().translate(c.cx() * Chunk.SIZE, 0, c.cz() * Chunk.SIZE);
+            Matrix4f model = new Matrix4f().translate(c.cx() * Chunk.SIZE, -0.125f, c.cz() * Chunk.SIZE);
             Matrix4f mvp = new Matrix4f(vp).mul(model);
 
             shader.setMat4("uMVP", mvp);
@@ -241,7 +234,7 @@ public class Renderer {
         int py = hit.y() + hit.ny();
         int pz = hit.z() + hit.nz();
 
-        chunkManager.setBlock(px, py, pz, BlockType.GRASS);
+        chunkManager.setBlock(px, py, pz, BlockType.WATER);
     }
 
     private void renderFPS(Window window) {
