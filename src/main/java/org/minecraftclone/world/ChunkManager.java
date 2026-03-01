@@ -9,6 +9,7 @@ public class ChunkManager {
     private final Map<Long, Chunk> chunks = new HashMap<>();
     private final Perlin2D noise = new Perlin2D(12345L);
     private final Perlin2D foliageNoise = new Perlin2D(54321L);
+    private final Noise3D caveNoise = new Noise3D(12345L);
 
 
     // Foliage
@@ -60,6 +61,7 @@ public class ChunkManager {
         final int seaLevel = 24;   // baseline height
         final int maxHeight = Chunk.HEIGHT - 1;
         final int dirtDepth = 2;
+        boolean cavesDone = false;
 
         for (int x = 0; x < Chunk.SIZE; x++) {
             for (int z = 0; z < Chunk.SIZE; z++) {
@@ -131,6 +133,7 @@ public class ChunkManager {
             }
         }
 
+        CaveCarver.carveChunk(this, c, 12345L); // use your world seed
         c.clearDirty();
     }
     public void setBlockIfLoaded(int wx, int wy, int wz, BlockType type) {
@@ -282,4 +285,5 @@ public class ChunkManager {
         }
         c.markDirty();
     }
+
 }

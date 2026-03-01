@@ -22,7 +22,7 @@ public class Renderer {
     private ChunkManager chunkManager;
 
     private Map<Long, ChunkRenderData> chunkMeshes = new HashMap<>();
-    private static final int VIEW_DISTANCE = 12;   // chunks
+    private static final int VIEW_DISTANCE = 8;   // chunks
     private int frameCounter = 0;
 
     private int fps;
