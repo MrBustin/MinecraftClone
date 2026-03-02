@@ -9,7 +9,7 @@ public class ChunkManager {
     private final Map<Long, Chunk> chunks = new HashMap<>();
     private final Perlin2D noise = new Perlin2D(12345L);
     private final Perlin2D foliageNoise = new Perlin2D(54321L);
-    private final Noise3D caveNoise = new Noise3D(12345L);
+    private static final FastNoiseLite caveNoise = new FastNoiseLite();
 
 
     // Foliage
@@ -36,6 +36,54 @@ public class ChunkManager {
         });
     }
 
+    public static void initWorldGen(long seed) {
+        caveNoise.SetSeed((int) seed);
+        caveNoise.SetNoiseType(FastNoiseLite.NoiseType.OpenSimplex2);
+    }
+
+    private static boolean caveColumnActive(int wx, int wz) {
+        // super cheap 2D mask: most columns skip carving entirely
+        // tweak threshold to change how many columns get caves
+        return caveNoise.GetNoise(wx * 0.03f, wz * 0.03f) > 0.15f;
+    }
+
+    private static float getCaveNoise(int wx, int wy, int wz) {
+        float n = caveNoise.GetNoise(wx * 1.5f, wy * 1.5f, wz * 1.5f);
+        n += caveNoise.GetNoise(wx * 2.5f, wy * 2.5f, wz * 2.5f);
+        return n;
+    }
+
+    private static boolean isCaveAtDepth(int wx, int y, int wz, int surfaceHeight) {
+        float n = getCaveNoise(wx, y, wz); // ~[-2,2]
+
+        int depth = surfaceHeight - y;      // 0 at surface, bigger = deeper
+        if (depth < 0) depth = 0;
+
+        // Tune these:
+        // - within first ~6 blocks below surface: very rare
+        // - at ~30 blocks below surface: common
+        float shallow = 6f;
+        float deep = 30f;
+
+        float t = (depth - shallow) / (deep - shallow); // 0..1
+        t = clamp01(t);
+
+        // Threshold slides from hard (rare) near surface to easy (common) deep
+        float threshold = lerp(1.35f, 0.65f, t);
+
+        return n > threshold;
+    }
+
+    private static float lerp(float a, float b, float t) {
+        return a + (b - a) * t;
+    }
+
+    private static float clamp01(float v) {
+        if (v < 0f) return 0f;
+        if (v > 1f) return 1f;
+        return v;
+    }
+
     public Chunk getIfLoaded(int cx, int cz) {
         long key = new ChunkPos(cx, cz).key();
         return chunks.get(key);
@@ -58,29 +106,28 @@ public class ChunkManager {
         int baseX = c.cx() * Chunk.SIZE;
         int baseZ = c.cz() * Chunk.SIZE;
 
-        final int seaLevel = 24;   // baseline height
+        final int seaLevel = 24;   // relative baseline
         final int maxHeight = Chunk.HEIGHT - 1;
         final int dirtDepth = 2;
-        boolean cavesDone = false;
+
+        final int baseGround = 40;             // lifts terrain
+        final int seaLevelY = baseGround + seaLevel; // NEW: actual world sea level
 
         for (int x = 0; x < Chunk.SIZE; x++) {
             for (int z = 0; z < Chunk.SIZE; z++) {
                 int wx = baseX + x;
                 int wz = baseZ + z;
 
-                // scale controls how “wide” hills are
                 double n = noise.fbm(wx * 0.008, wz * 0.008, 5, 2.0, 0.5);
 
-                // amplitude controls hill height
-                int height = (int) Math.round(seaLevel + n * 26);
-
+                int height = (int) Math.round(baseGround + seaLevel + n * 26);
                 if (height < 1) height = 1;
                 if (height > maxHeight) height = maxHeight;
 
                 // build column 0..height
                 for (int y = 0; y <= height; y++) {
                     if (y == height) {
-                        c.set(x, y, z, (y <= seaLevel + 1) ? BlockType.SAND : BlockType.GRASS);
+                        c.set(x, y, z, (y <= seaLevelY + 1) ? BlockType.SAND : BlockType.GRASS);
                     } else if (y >= height - dirtDepth) {
                         c.set(x, y, z, BlockType.DIRT);
                     } else {
@@ -88,20 +135,50 @@ public class ChunkManager {
                     }
                 }
 
-                // fill water ABOVE ground up to seaLevel
-                if (height < seaLevel) {
-                    int waterTop = Math.min(seaLevel, maxHeight);
+                // fill water ABOVE ground up to seaLevelY (do this before carving)
+                if (height < seaLevelY) {
+                    int waterTop = Math.min(seaLevelY, maxHeight);
                     for (int y = height + 1; y <= waterTop; y++) {
                         c.set(x, y, z, BlockType.WATER);
                     }
                 }
 
-                // ---- Simple foliage template (LOG only) ----
+                // ---- Cave carving (FastNoiseLite 3D) ----
+                if (caveColumnActive(wx, wz)) {
 
-                if (height >= seaLevel) { // don't place underwater
+                    final int caveFloor = 2;
+                    final int caveCeiling = seaLevelY + 8;
 
+                    int topCarveY = Math.min(height, caveCeiling);
+
+                    final int stride = 2; // 2 = good speedup, 3 = faster but blockier
+
+                    for (int y = caveFloor; y <= topCarveY; y += stride) {
+                        // Only bother if this sample point is in solid terrain
+                        BlockType t = c.get(x, y, z);
+                        if (t != BlockType.STONE && t != BlockType.DIRT && t != BlockType.SAND) continue;
+
+                        if (isCaveAtDepth(wx, y, wz,height)) {
+                            // Carve a small blob so stride doesn't look like "holes"
+                            for (int dy = 0; dy < stride; dy++) {
+                                int yy = y + dy;
+                                if (yy > topCarveY) break;
+
+                                // carve center + 4-neighbors (cheap "rounder" caves)
+                                carveIfSolid(c, x, yy, z);
+                                carveIfSolid(c, x + 1, yy, z);
+                                carveIfSolid(c, x - 1, yy, z);
+                                carveIfSolid(c, x, yy, z + 1);
+                                carveIfSolid(c, x, yy, z - 1);
+                            }
+                        }
+                    }
+                }
+
+                // ---- Foliage ----
+                if (height >= seaLevelY) {
                     double f = foliageNoise.noise(wx * 0.03, wz * 0.03);
-                    final int cell = 6; // spacing: 8 = fewer clumps, try 10/12 for even fewer
+                    final int cell = 6;
 
                     int cellX = Math.floorDiv(wx, cell);
                     int cellZ = Math.floorDiv(wz, cell);
@@ -113,17 +190,13 @@ public class ChunkManager {
                     int candX = cellX * cell + ox;
                     int candZ = cellZ * cell + oz;
 
-                    if (wx != candX || wz != candZ) continue; // only 1 spot per cell can place a log
-                    double density = (f + 1.0) * 0.5; // convert [-1,1] -> [0,1]
+                    if (wx != candX || wz != candZ) continue;
+
+                    double density = (f + 1.0) * 0.5;
 
                     if (c.get(x, height, z) == BlockType.GRASS) {
-
-                        // simple threshold
                         if (density > 0.45) {
-
-                            // deterministic pseudo-random thinning
                             float r = rand01(wx, wz, 1337);
-
                             if (r < 0.15f) {
                                 treeFeature.place(this, c, wx, height + 1, wz);
                             }
@@ -132,9 +205,6 @@ public class ChunkManager {
                 }
             }
         }
-
-        CaveCarver.carveChunk(this, c, 12345L); // use your world seed
-        c.clearDirty();
     }
     public void setBlockIfLoaded(int wx, int wy, int wz, BlockType type) {
         int cx = floorDiv(wx, Chunk.SIZE);
@@ -147,6 +217,13 @@ public class ChunkManager {
         if (c == null) return; // DON'T create chunks during generation
 
         c.set(lx, wy, lz, type);
+    }
+
+    private static void carveIfSolid(Chunk c, int x, int y, int z) {
+        BlockType t = c.get(x, y, z);
+        if (t == BlockType.STONE || t == BlockType.DIRT || t == BlockType.SAND || t == BlockType.GRASS) {
+            c.set(x, y, z, BlockType.AIR);
+        }
     }
 
     // Global block lookup (handles chunk boundaries)

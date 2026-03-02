@@ -2,7 +2,7 @@ package org.minecraftclone.world;
 
 public class Chunk {
     public static final int SIZE = 16;
-    public static final int HEIGHT = 64; // bump to 256 later
+    public static final int HEIGHT = 128; // bump to 256 later
 
     private final int cx, cz;
     private final BlockType[] blocks = new BlockType[SIZE * HEIGHT * SIZE];
