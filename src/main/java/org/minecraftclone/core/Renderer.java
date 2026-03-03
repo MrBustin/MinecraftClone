@@ -70,6 +70,7 @@ public class Renderer {
 
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        glEnable(GL_CULL_FACE);
 
         shader = new ShaderProgram(VERT, FRAG);
         texture = new Texture("/textures/atlas.png");
