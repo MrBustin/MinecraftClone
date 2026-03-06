@@ -57,53 +57,55 @@ public class ChunkManager {
     }
 
     private void generateTerrain(Chunk c) {
-        FastNoiseLite heightNoise = new FastNoiseLite();
-        heightNoise.SetNoiseType(FastNoiseLite.NoiseType.OpenSimplex2);
-        heightNoise.SetFrequency(0.005f);
+        FastNoiseLite baseNoise = new FastNoiseLite();
+        baseNoise.SetNoiseType(FastNoiseLite.NoiseType.OpenSimplex2);
+        baseNoise.SetFrequency(0.005f);
 
-        FastNoiseLite detailNoise = new FastNoiseLite();
-        detailNoise.SetNoiseType(FastNoiseLite.NoiseType.OpenSimplex2);
-        detailNoise.SetFrequency(0.04f);
+        FastNoiseLite mountainNoise = new FastNoiseLite();
+        mountainNoise.SetNoiseType(FastNoiseLite.NoiseType.OpenSimplex2);
+        mountainNoise.SetFrequency(0.005f);
+
+        FastNoiseLite mountainMaskNoise = new FastNoiseLite();
+        mountainMaskNoise.SetNoiseType(FastNoiseLite.NoiseType.OpenSimplex2);
+        mountainMaskNoise.SetFrequency(0.002f);
 
         for (int x = 0; x < Chunk.SIZE; x++) {
             for (int z = 0; z < Chunk.SIZE; z++) {
-
                 int worldX = c.cx() * Chunk.SIZE + x;
                 int worldZ = c.cz() * Chunk.SIZE + z;
 
-                int height = (int) (heightNoise.GetNoise(worldX, worldZ) * 20f + 50f);
+                float base = baseNoise.GetNoise(worldX, worldZ);
+                float mountain = mountainNoise.GetNoise(worldX, worldZ);
+                float mask = mountainMaskNoise.GetNoise(worldX, worldZ);
 
-                // base terrain fill
+                float baseHeight = base * 12f + 45f;
+
+                mountain = Math.abs(mountain);
+                mountain = (float)Math.pow(mountain, 1.8f);
+
+                mask = (mask + 1f) * 0.5f;
+                mask = Math.max(0f, mask - 0.45f) / 0.55f;
+
+                float uplift = mask * 18f;
+                float peakiness = mountain * mask * 22f;
+
+                int height = (int)(baseHeight + uplift + peakiness);
+
                 for (int y = 0; y <= height && y < Chunk.HEIGHT; y++) {
                     c.set(x, y, z, BlockType.STONE);
                 }
+            }
+        }
 
-                // cheap overhang / cliff shaping pass
-                int minY = Math.max(0, height - 8);
-                int maxY = Math.min(Chunk.HEIGHT - 1, height + 4);
-
-                for (int y = minY; y <= maxY; y++) {
-                    float d = detailNoise.GetNoise(worldX, y, worldZ);
-
-                    // carve some blocks out
-                    if (d > 0.35f) {
-                        c.set(x, y, z, BlockType.AIR);
-                    }
-
-                    // optional: add some outward blobs above surface
-//                if (y > height && d < -0.45f) {
-//                    c.set(x, y, z, BlockType.STONE);
-//                }
-                }
-
-                // surface layers: 1 grass, 3 dirt, rest stone
+        for (int x = 0; x < Chunk.SIZE; x++) {
+            for (int z = 0; z < Chunk.SIZE; z++) {
                 boolean foundSurface = false;
                 int dirtLeft = 3;
 
                 for (int y = Chunk.HEIGHT - 1; y >= 0; y--) {
                     BlockType block = c.get(x, y, z);
 
-                    if (block == BlockType.AIR) continue;
+                    if (block == BlockType.AIR || block == BlockType.WATER) continue;
 
                     if (!foundSurface) {
                         c.set(x, y, z, BlockType.GRASS);
@@ -114,6 +116,40 @@ public class ChunkManager {
                     } else {
                         c.set(x, y, z, BlockType.STONE);
                     }
+                }
+            }
+        }
+
+        int seaLevel = 40;
+
+        for (int x = 0; x < Chunk.SIZE; x++) {
+            for (int z = 0; z < Chunk.SIZE; z++) {
+                for (int y = 0; y < seaLevel && y < Chunk.HEIGHT; y++) {
+                    if (c.get(x, y, z) == BlockType.AIR) {
+                        c.set(x, y, z, BlockType.WATER);
+                    }
+                }
+            }
+        }
+
+        for (int x = 0; x < Chunk.SIZE; x++) {
+            for (int z = 0; z < Chunk.SIZE; z++) {
+                int worldX = c.cx() * Chunk.SIZE + x;
+                int worldZ = c.cz() * Chunk.SIZE + z;
+
+                int surfaceY = -1;
+                for (int y = Chunk.HEIGHT - 1; y >= 0; y--) {
+                    if (c.get(x, y, z) == BlockType.GRASS) {
+                        surfaceY = y;
+                        break;
+                    }
+                }
+
+                if (surfaceY == -1 || surfaceY < seaLevel) continue;
+
+                float r = rand01(worldX, worldZ, 1337);
+                if (r < 0.005f) {
+                    treeFeature.place(this, c, worldX, surfaceY + 1, worldZ);
                 }
             }
         }
