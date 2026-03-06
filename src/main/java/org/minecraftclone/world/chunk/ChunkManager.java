@@ -1,5 +1,8 @@
-package org.minecraftclone.world;
+package org.minecraftclone.world.chunk;
 
+import org.minecraftclone.world.BlockType;
+import org.minecraftclone.world.FastNoiseLite;
+import org.minecraftclone.world.Perlin2D;
 import org.minecraftclone.world.placedfeatures.TreeFeature;
 
 import java.util.HashMap;
@@ -7,7 +10,7 @@ import java.util.Map;
 
 public class ChunkManager {
     private final Map<Long, Chunk> chunks = new HashMap<>();
-    private final Perlin2D noise = new Perlin2D(12345L);
+    private final FastNoiseLite noise = new FastNoiseLite();
     private final Perlin2D foliageNoise = new Perlin2D(54321L);
 
 
@@ -54,78 +57,62 @@ public class ChunkManager {
     }
 
     private void generateTerrain(Chunk c) {
-        int baseX = c.cx() * Chunk.SIZE;
-        int baseZ = c.cz() * Chunk.SIZE;
+        FastNoiseLite heightNoise = new FastNoiseLite();
+        heightNoise.SetNoiseType(FastNoiseLite.NoiseType.OpenSimplex2);
+        heightNoise.SetFrequency(0.005f);
 
-        final int seaLevel = 24;   // baseline height
-        final int maxHeight = Chunk.HEIGHT - 1;
-        final int dirtDepth = 2;
+        FastNoiseLite detailNoise = new FastNoiseLite();
+        detailNoise.SetNoiseType(FastNoiseLite.NoiseType.OpenSimplex2);
+        detailNoise.SetFrequency(0.04f);
 
         for (int x = 0; x < Chunk.SIZE; x++) {
             for (int z = 0; z < Chunk.SIZE; z++) {
-                int wx = baseX + x;
-                int wz = baseZ + z;
 
-                // scale controls how “wide” hills are
-                double n = noise.fbm(wx * 0.008, wz * 0.008, 5, 2.0, 0.5);
+                int worldX = c.cx() * Chunk.SIZE + x;
+                int worldZ = c.cz() * Chunk.SIZE + z;
 
-                // amplitude controls hill height
-                int height = (int) Math.round(seaLevel + n * 26);
+                int height = (int) (heightNoise.GetNoise(worldX, worldZ) * 20f + 50f);
 
-                if (height < 1) height = 1;
-                if (height > maxHeight) height = maxHeight;
+                // base terrain fill
+                for (int y = 0; y <= height && y < Chunk.HEIGHT; y++) {
+                    c.set(x, y, z, BlockType.STONE);
+                }
 
-                // build column 0..height
-                for (int y = 0; y <= height; y++) {
-                    if (y == height) {
-                        c.set(x, y, z, (y <= seaLevel + 1) ? BlockType.SAND : BlockType.GRASS);
-                    } else if (y >= height - dirtDepth) {
+                // cheap overhang / cliff shaping pass
+                int minY = Math.max(0, height - 8);
+                int maxY = Math.min(Chunk.HEIGHT - 1, height + 4);
+
+                for (int y = minY; y <= maxY; y++) {
+                    float d = detailNoise.GetNoise(worldX, y, worldZ);
+
+                    // carve some blocks out
+                    if (d > 0.35f) {
+                        c.set(x, y, z, BlockType.AIR);
+                    }
+
+                    // optional: add some outward blobs above surface
+//                if (y > height && d < -0.45f) {
+//                    c.set(x, y, z, BlockType.STONE);
+//                }
+                }
+
+                // surface layers: 1 grass, 3 dirt, rest stone
+                boolean foundSurface = false;
+                int dirtLeft = 3;
+
+                for (int y = Chunk.HEIGHT - 1; y >= 0; y--) {
+                    BlockType block = c.get(x, y, z);
+
+                    if (block == BlockType.AIR) continue;
+
+                    if (!foundSurface) {
+                        c.set(x, y, z, BlockType.GRASS);
+                        foundSurface = true;
+                    } else if (dirtLeft > 0) {
                         c.set(x, y, z, BlockType.DIRT);
+                        dirtLeft--;
                     } else {
                         c.set(x, y, z, BlockType.STONE);
-                    }
-                }
-
-                // fill water ABOVE ground up to seaLevel
-                if (height < seaLevel) {
-                    int waterTop = Math.min(seaLevel, maxHeight);
-                    for (int y = height + 1; y <= waterTop; y++) {
-                        c.set(x, y, z, BlockType.WATER);
-                    }
-                }
-
-                // ---- Simple foliage template (LOG only) ----
-
-                if (height >= seaLevel) { // don't place underwater
-
-                    double f = foliageNoise.noise(wx * 0.03, wz * 0.03);
-                    final int cell = 6; // spacing: 8 = fewer clumps, try 10/12 for even fewer
-
-                    int cellX = Math.floorDiv(wx, cell);
-                    int cellZ = Math.floorDiv(wz, cell);
-
-                    int h = hash2D(cellX, cellZ, 9001);
-                    int ox = Math.floorMod(h, cell);
-                    int oz = Math.floorMod(h >>> 8, cell);
-
-                    int candX = cellX * cell + ox;
-                    int candZ = cellZ * cell + oz;
-
-                    if (wx != candX || wz != candZ) continue; // only 1 spot per cell can place a log
-                    double density = (f + 1.0) * 0.5; // convert [-1,1] -> [0,1]
-
-                    if (c.get(x, height, z) == BlockType.GRASS) {
-
-                        // simple threshold
-                        if (density > 0.45) {
-
-                            // deterministic pseudo-random thinning
-                            float r = rand01(wx, wz, 1337);
-
-                            if (r < 0.15f) {
-                                treeFeature.place(this, c, wx, height + 1, wz);
-                            }
-                        }
                     }
                 }
             }

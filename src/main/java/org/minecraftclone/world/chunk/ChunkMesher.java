@@ -1,6 +1,8 @@
-package org.minecraftclone.world;
+package org.minecraftclone.world.chunk;
 
 import org.minecraftclone.gfx.FloatList;
+import org.minecraftclone.world.BlockType;
+import org.minecraftclone.world.Face;
 
 public final class ChunkMesher {
 

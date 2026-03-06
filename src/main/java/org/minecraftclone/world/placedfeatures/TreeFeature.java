@@ -1,8 +1,8 @@
 package org.minecraftclone.world.placedfeatures;
 
 import org.minecraftclone.world.BlockType;
-import org.minecraftclone.world.Chunk;
-import org.minecraftclone.world.ChunkManager;
+import org.minecraftclone.world.chunk.Chunk;
+import org.minecraftclone.world.chunk.ChunkManager;
 
 import java.util.Random;
 

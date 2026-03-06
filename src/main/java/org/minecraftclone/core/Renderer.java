@@ -7,6 +7,10 @@ import org.lwjgl.stb.STBEasyFont;
 import org.lwjgl.system.MemoryUtil;
 import org.minecraftclone.gfx.*;
 import org.minecraftclone.world.*;
+import org.minecraftclone.world.chunk.Chunk;
+import org.minecraftclone.world.chunk.ChunkManager;
+import org.minecraftclone.world.chunk.ChunkMesher;
+import org.minecraftclone.world.chunk.ChunkPos;
 
 import java.util.HashMap;
 import java.util.Map;

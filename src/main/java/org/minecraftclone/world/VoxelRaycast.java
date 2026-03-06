@@ -1,6 +1,7 @@
 package org.minecraftclone.world;
 
 import org.joml.Vector3f;
+import org.minecraftclone.world.chunk.ChunkManager;
 
 public final class VoxelRaycast {
 

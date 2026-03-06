@@ -1,4 +1,6 @@
-package org.minecraftclone.world;
+package org.minecraftclone.world.chunk;
+
+import org.minecraftclone.world.BlockType;
 
 public class Chunk {
     public static final int SIZE = 16;

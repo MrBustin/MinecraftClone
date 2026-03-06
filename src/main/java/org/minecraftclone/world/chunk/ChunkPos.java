@@ -1,4 +1,4 @@
-package org.minecraftclone.world;
+package org.minecraftclone.world.chunk;
 
 public record ChunkPos(int x, int z) {
     public long key() {
