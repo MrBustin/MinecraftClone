@@ -1,6 +1,7 @@
 package org.minecraftclone.world;
 
 import org.joml.Vector3f;
+import org.minecraftclone.world.block.Blocks;
 import org.minecraftclone.world.chunk.ChunkManager;
 
 public final class VoxelRaycast {
@@ -31,8 +32,8 @@ public final class VoxelRaycast {
 
         float dist = 0f;
         while (dist <= maxDist) {
-            BlockType bt = world.getBlockIfLoaded(x, y, z);
-            if (bt != BlockType.AIR) {
+            Blocks bt = world.getBlockIfLoaded(x, y, z);
+            if (bt != Blocks.AIR) {
                 return new Hit(x, y, z, nx, ny, nz);
             }
 

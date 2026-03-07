@@ -1,12 +1,21 @@
 package org.minecraftclone.world.chunk;
 
 import org.minecraftclone.gfx.FloatList;
-import org.minecraftclone.world.BlockType;
-import org.minecraftclone.world.Face;
+import org.minecraftclone.init.BlockRegistry;
+import org.minecraftclone.world.block.*;
+import org.minecraftclone.world.block.meshers.CrossBlockMesher;
+import org.minecraftclone.world.block.meshers.CubeBlockMesher;
+
+import java.util.Map;
 
 public final class ChunkMesher {
 
     public record ChunkMeshData(float[] solid, float[] water) {}
+
+    private static final Map<BlockType, BlockMesher> MESHERS = Map.of(
+            BlockType.CUBE, new CubeBlockMesher(),
+            BlockType.CROSS, new CrossBlockMesher()
+    );
 
     public static ChunkMeshData buildMesh(ChunkManager world, Chunk chunk) {
         FloatList solid = new FloatList();
@@ -18,140 +27,28 @@ public final class ChunkMesher {
         for (int x = 0; x < Chunk.SIZE; x++) {
             for (int y = 0; y < Chunk.HEIGHT; y++) {
                 for (int z = 0; z < Chunk.SIZE; z++) {
+                    Blocks block = chunk.get(x, y, z);
+                    if (block == Blocks.AIR) continue;
 
-                    BlockType t = chunk.get(x, y, z);
-                    if (t == BlockType.AIR) continue;
+                    BlockDefinition def = BlockRegistry.get(block);
+                    if (def == null) continue;
+
+                    FloatList target = (block == Blocks.WATER) ? water : solid;
 
                     int wx = baseX + x;
                     int wz = baseZ + z;
 
-                    // choose which mesh we append to
-                    FloatList target =
-                            (t == BlockType.WATER) ? water : solid;
+                    BlockMesher mesher = MESHERS.get(def.modelType());
+                    if (mesher == null) continue;
 
-                    // For solids: face visible if neighbor is AIR
-                    // For water: face visible if neighbor is AIR (not water), so water merges into one volume
-                    BlockType nFront  = world.getBlockForMeshing(wx, y, wz + 1);
-                    BlockType nBack   = world.getBlockForMeshing(wx, y, wz - 1);
-                    BlockType nLeft   = world.getBlockForMeshing(wx - 1, y, wz);
-                    BlockType nRight  = world.getBlockForMeshing(wx + 1, y, wz);
-                    BlockType nTop    = world.getBlockForMeshing(wx, y + 1, wz);
-                    BlockType nBottom = world.getBlockForMeshing(wx, y - 1, wz);
-
-                    if (isFaceVisible(t, nFront)) {
-                        float[] uv = uvFor(t, Face.FRONT);
-                        addFront(target, x, y, z, uv[0], uv[1], uv[2], uv[3]);
-                    }
-                    if (isFaceVisible(t, nBack)) {
-                        float[] uv = uvFor(t, Face.BACK);
-                        addBack(target, x, y, z, uv[0], uv[1], uv[2], uv[3]);
-                    }
-                    if (isFaceVisible(t, nLeft)) {
-                        float[] uv = uvFor(t, Face.LEFT);
-                        addLeft(target, x, y, z, uv[0], uv[1], uv[2], uv[3]);
-                    }
-                    if (isFaceVisible(t, nRight)) {
-                        float[] uv = uvFor(t, Face.RIGHT);
-                        addRight(target, x, y, z, uv[0], uv[1], uv[2], uv[3]);
-                    }
-                    if (isFaceVisible(t, nTop)) {
-                        float[] uv = uvFor(t, Face.TOP);
-                        addTop(target, x, y, z, uv[0], uv[1], uv[2], uv[3]);
-                    }
-                    if (isFaceVisible(t, nBottom)) {
-                        float[] uv = uvFor(t, Face.BOTTOM);
-                        addBottom(target, x, y, z, uv[0], uv[1], uv[2], uv[3]);
-                    }
+                    mesher.build(new BlockMeshContext(
+                            world, chunk, target, block, def,
+                            x, y, z, wx, wz
+                    ));
                 }
             }
         }
 
         return new ChunkMeshData(solid.toArray(), water.toArray());
-    }
-
-    private static boolean isTransparent(BlockType t) {
-        return t == BlockType.AIR || t == BlockType.WATER;
-    }
-
-    private static boolean isFaceVisible(BlockType self, BlockType neighbor) {
-        if (self == BlockType.WATER) {
-            return neighbor == BlockType.AIR;
-        }
-        // solid faces render against transparent neighbors (air OR water)
-        return isTransparent(neighbor);
-    }
-
-    private static float[] uvFor(BlockType t, Face face) {
-        int tilesX = 16;
-        int tilesY = 16;
-
-        int tileX, tileY;
-
-        switch (t) {
-            //Cube All
-            case DIRT  -> { tileX = 0; tileY = 0; }
-            case STONE -> { tileX = 1; tileY = 0; }
-            case SAND  -> { tileX = 4; tileY = 0; }
-            case WATER -> { tileX = 0; tileY = 1; }
-            case LEAVES -> {tileX = 1; tileY = 1;}
-
-            //Custom
-            case GRASS -> {
-                if (face == Face.BOTTOM) { tileX = 0; tileY = 0; }      // dirt bottom
-                else if (face == Face.TOP) { tileX = 3; tileY = 0; }    // grass top
-                else { tileX = 2; tileY = 0; }                          // grass side
-            }
-            case LOG -> {
-                if (face == Face.BOTTOM || face == Face.TOP) { tileX = 6; tileY = 0; }      // log top and bottom
-                else { tileX = 5; tileY = 0; }                          // log side
-            }
-
-            default -> { tileX = 0; tileY = 0; }
-        }
-
-        float tw = 1.0f / tilesX;
-        float th = 1.0f / tilesY;
-
-        float u0 = tileX * tw;
-        float v0 = tileY * th;
-        float u1 = u0 + tw;
-        float v1 = v0 + th;
-
-        return new float[]{u0, v0, u1, v1};
-    }
-
-    private static void v(FloatList o, float x, float y, float z, float u, float v) {
-        o.add(x); o.add(y); o.add(z); o.add(u); o.add(v);
-    }
-
-    private static void addFront(FloatList o, int x, int y, int z, float u0, float v0, float u1, float v1) {
-        float x0=x, x1=x+1, y0=y, y1=y+1, z1=z+1;
-        v(o,x0,y0,z1, u0,v0); v(o,x1,y0,z1, u1,v0); v(o,x1,y1,z1, u1,v1);
-        v(o,x1,y1,z1, u1,v1); v(o,x0,y1,z1, u0,v1); v(o,x0,y0,z1, u0,v0);
-    }
-    private static void addBack(FloatList o, int x, int y, int z, float u0, float v0, float u1, float v1) {
-        float x0=x, x1=x+1, y0=y, y1=y+1, z0=z;
-        v(o,x1,y0,z0, u0,v0); v(o,x0,y0,z0, u1,v0); v(o,x0,y1,z0, u1,v1);
-        v(o,x0,y1,z0, u1,v1); v(o,x1,y1,z0, u0,v1); v(o,x1,y0,z0, u0,v0);
-    }
-    private static void addLeft(FloatList o, int x, int y, int z, float u0, float v0, float u1, float v1) {
-        float x0=x, y0=y, y1=y+1, z0=z, z1=z+1;
-        v(o,x0,y0,z0, u0,v0); v(o,x0,y0,z1, u1,v0); v(o,x0,y1,z1, u1,v1);
-        v(o,x0,y1,z1, u1,v1); v(o,x0,y1,z0, u0,v1); v(o,x0,y0,z0, u0,v0);
-    }
-    private static void addRight(FloatList o, int x, int y, int z, float u0, float v0, float u1, float v1) {
-        float x1=x+1, y0=y, y1=y+1, z0=z, z1=z+1;
-        v(o,x1,y0,z1, u0,v0); v(o,x1,y0,z0, u1,v0); v(o,x1,y1,z0, u1,v1);
-        v(o,x1,y1,z0, u1,v1); v(o,x1,y1,z1, u0,v1); v(o,x1,y0,z1, u0,v0);
-    }
-    private static void addTop(FloatList o, int x, int y, int z, float u0, float v0, float u1, float v1) {
-        float x0=x, x1=x+1, y1=y+1, z0=z, z1=z+1;
-        v(o,x0,y1,z1, u0,v0); v(o,x1,y1,z1, u1,v0); v(o,x1,y1,z0, u1,v1);
-        v(o,x1,y1,z0, u1,v1); v(o,x0,y1,z0, u0,v1); v(o,x0,y1,z1, u0,v0);
-    }
-    private static void addBottom(FloatList o, int x, int y, int z, float u0, float v0, float u1, float v1) {
-        float x0=x, x1=x+1, y0=y, z0=z, z1=z+1;
-        v(o,x0,y0,z0, u0,v0); v(o,x1,y0,z0, u1,v0); v(o,x1,y0,z1, u1,v1);
-        v(o,x1,y0,z1, u1,v1); v(o,x0,y0,z1, u0,v1); v(o,x0,y0,z0, u0,v0);
     }
 }

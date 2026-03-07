@@ -1,6 +1,6 @@
 package org.minecraftclone.world.placedfeatures;
 
-import org.minecraftclone.world.BlockType;
+import org.minecraftclone.world.block.Blocks;
 import org.minecraftclone.world.chunk.Chunk;
 import org.minecraftclone.world.chunk.ChunkManager;
 
@@ -49,7 +49,7 @@ public class TreeFeature extends PlacedFeature {
 
         // 1) Place trunk first
         for (int ty = 0; ty < trunkH; ty++) {
-            setSafe(cm, current, wx, wy + ty, wz, BlockType.LOG);
+            setSafe(cm, current, wx, wy + ty, wz, Blocks.LOG);
         }
 
         int ox = wx - w / 2;
@@ -71,13 +71,13 @@ public class TreeFeature extends PlacedFeature {
                     int pz = oz + z;
 
                     // keep your old leaf logic exactly
-                    if (ch == 'F') setSafe(cm, current, px, py, pz, BlockType.LEAVES);
+                    if (ch == 'F') setSafe(cm, current, px, py, pz, Blocks.LEAVES);
 
                     int num = getRandomNumber(1, 2);
                     if (num == 1) {
-                        if (ch == 'X') setSafe(cm, current, px, py, pz, BlockType.LEAVES);
+                        if (ch == 'X') setSafe(cm, current, px, py, pz, Blocks.LEAVES);
                     } else {
-                        if (ch == 'X') setSafe(cm, current, px, py, pz, BlockType.AIR);
+                        if (ch == 'X') setSafe(cm, current, px, py, pz, Blocks.AIR);
                     }
                 }
             }

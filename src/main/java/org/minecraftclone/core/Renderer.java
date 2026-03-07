@@ -7,6 +7,7 @@ import org.lwjgl.stb.STBEasyFont;
 import org.lwjgl.system.MemoryUtil;
 import org.minecraftclone.gfx.*;
 import org.minecraftclone.world.*;
+import org.minecraftclone.world.block.Blocks;
 import org.minecraftclone.world.chunk.Chunk;
 import org.minecraftclone.world.chunk.ChunkManager;
 import org.minecraftclone.world.chunk.ChunkMesher;
@@ -57,7 +58,9 @@ public class Renderer {
         uniform sampler2D uTex;
 
         void main() {
-            FragColor = texture(uTex, vUV);
+            vec4 c = texture(uTex, vUV);
+            if (c.a < 0.5) discard;
+            FragColor = c;
         }
         """;
 
@@ -228,7 +231,7 @@ public class Renderer {
     public void onBreakBlock() {
         var hit = VoxelRaycast.raycast(chunkManager, camera.getPosition(), camera.getForward(), 6f);
         if (hit == null) return;
-        chunkManager.setBlock(hit.x(), hit.y(), hit.z(), BlockType.AIR);
+        chunkManager.setBlock(hit.x(), hit.y(), hit.z(), Blocks.AIR);
     }
 
     public void onPlaceBlock() {
@@ -239,7 +242,7 @@ public class Renderer {
         int py = hit.y() + hit.ny();
         int pz = hit.z() + hit.nz();
 
-        chunkManager.setBlock(px, py, pz, BlockType.WATER);
+        chunkManager.setBlock(px, py, pz, Blocks.FLOWER);
     }
 
     private void renderFPS(Window window) {

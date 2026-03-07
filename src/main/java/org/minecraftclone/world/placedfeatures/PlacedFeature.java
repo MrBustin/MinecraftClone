@@ -1,6 +1,6 @@
 package org.minecraftclone.world.placedfeatures;
 
-import org.minecraftclone.world.BlockType;
+import org.minecraftclone.world.block.Blocks;
 import org.minecraftclone.world.chunk.Chunk;
 import org.minecraftclone.world.chunk.ChunkManager;
 
@@ -10,7 +10,7 @@ public abstract class PlacedFeature {
     public abstract void place(ChunkManager cm, Chunk current, int wx, int wy, int wz);
 
     /** Safe worldgen setter: write into current chunk if it matches, otherwise only into already-loaded neighbors. */
-    protected static void setSafe(ChunkManager cm, Chunk current, int wx, int wy, int wz, BlockType type) {
+    protected static void setSafe(ChunkManager cm, Chunk current, int wx, int wy, int wz, Blocks type) {
         if (wy < 0 || wy >= Chunk.HEIGHT) return;
 
         int cx = floorDiv(wx, Chunk.SIZE);

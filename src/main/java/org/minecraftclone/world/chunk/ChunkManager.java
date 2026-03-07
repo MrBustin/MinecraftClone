@@ -1,6 +1,6 @@
 package org.minecraftclone.world.chunk;
 
-import org.minecraftclone.world.BlockType;
+import org.minecraftclone.world.block.Blocks;
 import org.minecraftclone.world.FastNoiseLite;
 import org.minecraftclone.world.Perlin2D;
 import org.minecraftclone.world.placedfeatures.TreeFeature;
@@ -17,7 +17,7 @@ public class ChunkManager {
     // Foliage
     private final TreeFeature treeFeature = new TreeFeature();
     private final java.util.Map<Long, java.util.ArrayList<PendingBlock>> pending = new java.util.HashMap<>();
-    private record PendingBlock(int wx, int wy, int wz, BlockType type) {}
+    private record PendingBlock(int wx, int wy, int wz, Blocks type) {}
 
     public Chunk getOrCreate(int cx, int cz) {
         long key = new ChunkPos(cx, cz).key();
@@ -43,7 +43,7 @@ public class ChunkManager {
         return chunks.get(key);
     }
 
-    public BlockType getBlockIfLoaded(int wx, int wy, int wz) {
+    public Blocks getBlockIfLoaded(int wx, int wy, int wz) {
         int cx = floorDiv(wx, Chunk.SIZE);
         int cz = floorDiv(wz, Chunk.SIZE);
 
@@ -51,12 +51,15 @@ public class ChunkManager {
         int lz = mod(wz, Chunk.SIZE);
 
         Chunk c = getIfLoaded(cx, cz);
-        if (c == null) return BlockType.AIR; // missing chunk treated as air
+        if (c == null) return Blocks.AIR; // missing chunk treated as air
 
         return c.get(lx, wy, lz);
     }
 
     private void generateTerrain(Chunk c) {
+        //
+        //Noise Maps
+        //
         FastNoiseLite baseNoise = new FastNoiseLite();
         baseNoise.SetNoiseType(FastNoiseLite.NoiseType.OpenSimplex2);
         baseNoise.SetFrequency(0.005f);
@@ -69,6 +72,14 @@ public class ChunkManager {
         mountainMaskNoise.SetNoiseType(FastNoiseLite.NoiseType.OpenSimplex2);
         mountainMaskNoise.SetFrequency(0.002f);
 
+        FastNoiseLite shoreNoise = new FastNoiseLite();
+        shoreNoise.SetNoiseType(FastNoiseLite.NoiseType.OpenSimplex2);
+        shoreNoise.SetFrequency(0.05f);
+
+        int seaLevel = 40;
+        //
+        //Base Terrain Noise
+        //
         for (int x = 0; x < Chunk.SIZE; x++) {
             for (int z = 0; z < Chunk.SIZE; z++) {
                 int worldX = c.cx() * Chunk.SIZE + x;
@@ -91,47 +102,61 @@ public class ChunkManager {
 
                 int height = (int)(baseHeight + uplift + peakiness);
 
+                if (height >= seaLevel - 3 && height <= seaLevel + 2) {
+                    height += (int)(shoreNoise.GetNoise(worldX, worldZ) * 2f);
+                }
+
                 for (int y = 0; y <= height && y < Chunk.HEIGHT; y++) {
-                    c.set(x, y, z, BlockType.STONE);
+                    c.set(x, y, z, Blocks.STONE);
                 }
             }
         }
 
+        //
+        //Surface Layer
+        //
         for (int x = 0; x < Chunk.SIZE; x++) {
             for (int z = 0; z < Chunk.SIZE; z++) {
                 boolean foundSurface = false;
                 int dirtLeft = 3;
 
                 for (int y = Chunk.HEIGHT - 1; y >= 0; y--) {
-                    BlockType block = c.get(x, y, z);
+                    Blocks block = c.get(x, y, z);
 
-                    if (block == BlockType.AIR || block == BlockType.WATER) continue;
+                    if (block == Blocks.AIR || block == Blocks.WATER) continue;
 
                     if (!foundSurface) {
-                        c.set(x, y, z, BlockType.GRASS);
+                        c.set(x, y, z, Blocks.GRASS);
                         foundSurface = true;
                     } else if (dirtLeft > 0) {
-                        c.set(x, y, z, BlockType.DIRT);
+                        c.set(x, y, z, Blocks.DIRT);
                         dirtLeft--;
                     } else {
-                        c.set(x, y, z, BlockType.STONE);
+                        c.set(x, y, z, Blocks.STONE);
                     }
                 }
             }
         }
 
-        int seaLevel = 40;
+        //
+        //Water Placement
+        //
 
         for (int x = 0; x < Chunk.SIZE; x++) {
             for (int z = 0; z < Chunk.SIZE; z++) {
-                for (int y = 0; y < seaLevel && y < Chunk.HEIGHT; y++) {
-                    if (c.get(x, y, z) == BlockType.AIR) {
-                        c.set(x, y, z, BlockType.WATER);
+                for (int y = 0; y < seaLevel; y++) {
+                    if (c.get(x, y, z) == Blocks.AIR) {
+                        c.set(x, y, z, Blocks.WATER);
+                    }else if (c.get(x, y, z) == Blocks.GRASS){
+                        c.set(x, y, z, Blocks.SAND);
                     }
                 }
             }
         }
 
+        //
+        // Placed Features
+        //
         for (int x = 0; x < Chunk.SIZE; x++) {
             for (int z = 0; z < Chunk.SIZE; z++) {
                 int worldX = c.cx() * Chunk.SIZE + x;
@@ -139,7 +164,7 @@ public class ChunkManager {
 
                 int surfaceY = -1;
                 for (int y = Chunk.HEIGHT - 1; y >= 0; y--) {
-                    if (c.get(x, y, z) == BlockType.GRASS) {
+                    if (c.get(x, y, z) == Blocks.GRASS) {
                         surfaceY = y;
                         break;
                     }
@@ -156,7 +181,7 @@ public class ChunkManager {
 
         c.clearDirty();
     }
-    public void setBlockIfLoaded(int wx, int wy, int wz, BlockType type) {
+    public void setBlockIfLoaded(int wx, int wy, int wz, Blocks type) {
         int cx = floorDiv(wx, Chunk.SIZE);
         int cz = floorDiv(wz, Chunk.SIZE);
 
@@ -170,7 +195,7 @@ public class ChunkManager {
     }
 
     // Global block lookup (handles chunk boundaries)
-    public BlockType getBlock(int wx, int wy, int wz) {
+    public Blocks getBlock(int wx, int wy, int wz) {
         int cx = floorDiv(wx, Chunk.SIZE);
         int cz = floorDiv(wz, Chunk.SIZE);
 
@@ -238,7 +263,7 @@ public class ChunkManager {
         return unloadedKeys;
     }
 
-    public void setBlock(int wx, int wy, int wz, BlockType type) {
+    public void setBlock(int wx, int wy, int wz, Blocks type) {
         int cx = floorDiv(wx, Chunk.SIZE);
         int cz = floorDiv(wz, Chunk.SIZE);
 
@@ -262,12 +287,12 @@ public class ChunkManager {
         }
     }
 
-    public BlockType getBlockForMeshing(int wx, int wy, int wz) {
+    public Blocks getBlockForMeshing(int wx, int wy, int wz) {
         int cx = floorDiv(wx, Chunk.SIZE);
         int cz = floorDiv(wz, Chunk.SIZE);
 
         Chunk c = getIfLoaded(cx, cz);
-        if (c == null) return BlockType.STONE; // anything non-air: prevents border faces
+        if (c == null) return Blocks.STONE; // anything non-air: prevents border faces
 
         int lx = mod(wx, Chunk.SIZE);
         int lz = mod(wz, Chunk.SIZE);
@@ -284,7 +309,7 @@ public class ChunkManager {
         return (hash2D(x, z, seed) & 0xFFFFFF) / (float) 0x1000000;
     }
 
-    public void queueBlock(int wx, int wy, int wz, BlockType type) {
+    public void queueBlock(int wx, int wy, int wz, Blocks type) {
         int cx = floorDiv(wx, Chunk.SIZE);
         int cz = floorDiv(wz, Chunk.SIZE);
         long key = new ChunkPos(cx, cz).key();
