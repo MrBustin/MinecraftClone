@@ -242,7 +242,7 @@ public class Renderer {
         int py = hit.y() + hit.ny();
         int pz = hit.z() + hit.nz();
 
-        chunkManager.setBlock(px, py, pz, Blocks.FLOWER);
+        chunkManager.setBlock(px, py, pz, Blocks.TALL_GRASS);
     }
 
     private void renderFPS(Window window) {

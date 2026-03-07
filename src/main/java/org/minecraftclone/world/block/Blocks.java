@@ -9,5 +9,6 @@ public enum Blocks {
     WATER,
     LOG,
     LEAVES,
-    FLOWER
+    FLOWER,
+    TALL_GRASS
 }

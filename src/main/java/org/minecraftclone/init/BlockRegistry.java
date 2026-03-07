@@ -61,6 +61,13 @@ public class BlockRegistry {
                 (block, face) -> tile(2, 1)
         ));
 
+        register(Blocks.TALL_GRASS, new BlockDefinition(
+                BlockType.CROSS,
+                true,
+                false,
+                (block, face) -> tile(3, 1)
+        ));
+
         register(Blocks.LEAVES, new BlockDefinition(
                 BlockType.CUBE,
                 true,
