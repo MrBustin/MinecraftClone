@@ -70,10 +70,12 @@ public class Game {
             // ---- Keyboard Movement ----
             boolean forward  = glfwGetKey(window.handle(), GLFW_KEY_W) == GLFW_PRESS;
             boolean backward = glfwGetKey(window.handle(), GLFW_KEY_S) == GLFW_PRESS;
+            boolean up = glfwGetKey(window.handle(), GLFW_KEY_SPACE) == GLFW_PRESS;
+            boolean down = glfwGetKey(window.handle(), GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS;
             boolean left     = glfwGetKey(window.handle(), GLFW_KEY_A) == GLFW_PRESS;
             boolean right    = glfwGetKey(window.handle(), GLFW_KEY_D) == GLFW_PRESS;
 
-            renderer.getCamera().processKeyboard(forward, backward, left, right, dt);
+            renderer.getCamera().processKeyboard(forward, backward, up, down, left, right, dt);
 
             if (glfwGetKey(window.handle(), GLFW_KEY_ESCAPE) == GLFW_PRESS) {
                 glfwSetWindowShouldClose(window.handle(), true);

@@ -11,14 +11,14 @@ public class Camera {
     private float pitch = 0f;
 
     private final Vector3f front = new Vector3f(0, 0, -1);
-    private final Vector3f up = new Vector3f(0, 1, 0);
+    private final Vector3f up1 = new Vector3f(0, 1, 0);
 
     public Matrix4f getViewMatrix() {
         updateVectors();
         return new Matrix4f().lookAt(
                 position,
                 new Vector3f(position).add(front),
-                up
+                up1
         );
     }
 
@@ -44,15 +44,17 @@ public class Camera {
         if (pitch < -89f) pitch = -89f;
     }
 
-    public void processKeyboard(boolean forward, boolean backward,
+    public void processKeyboard(boolean forward, boolean backward, boolean up, boolean down,
                                 boolean left, boolean right, float dt) {
 
         float speed = 10.5f * dt;
 
-        Vector3f rightVec = new Vector3f(front).cross(up).normalize();
+        Vector3f rightVec = new Vector3f(front).cross(up1).normalize();
 
         if (forward) position.add(new Vector3f(front).mul(speed));
         if (backward) position.sub(new Vector3f(front).mul(speed));
+        if (up) position.add(new Vector3f(up1).mul(speed));
+        if (down) position.sub(new Vector3f(up1).mul(speed));
         if (left) position.sub(new Vector3f(rightVec).mul(speed));
         if (right) position.add(new Vector3f(rightVec).mul(speed));
     }
