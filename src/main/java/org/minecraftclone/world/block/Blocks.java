@@ -8,7 +8,9 @@ public enum Blocks {
     SAND,
     WATER,
     LOG,
+    SNOW,
     LEAVES,
     FLOWER,
-    TALL_GRASS
+    TALL_GRASS,
+    REEDS
 }

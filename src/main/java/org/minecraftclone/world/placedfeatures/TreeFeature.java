@@ -8,6 +8,8 @@ import java.util.Random;
 
 public class TreeFeature extends PlacedFeature {
 
+    private static final Random RAND = new Random();
+
     private static final String[][] LAYERS = new String[][]{
             {
                     "XFFFX",
@@ -47,16 +49,12 @@ public class TreeFeature extends PlacedFeature {
 
         int trunkH = getRandomNumber(1, 4);
 
-        // 1) Place trunk first
         for (int ty = 0; ty < trunkH; ty++) {
             setSafe(cm, current, wx, wy + ty, wz, Blocks.LOG);
         }
 
         int ox = wx - w / 2;
         int oz = wz - d / 2;
-
-
-        // 3) Start the canopy AFTER the trunk is generated
         int canopyBaseY = wy + trunkH;
 
         for (int y = 0; y < h; y++) {
@@ -67,17 +65,15 @@ public class TreeFeature extends PlacedFeature {
                     if (ch == ' ') continue;
 
                     int px = ox + x;
-                    int py = canopyBaseY + (y);
+                    int py = canopyBaseY + y;
                     int pz = oz + z;
 
-                    // keep your old leaf logic exactly
-                    if (ch == 'F') setSafe(cm, current, px, py, pz, Blocks.LEAVES);
-
-                    int num = getRandomNumber(1, 2);
-                    if (num == 1) {
-                        if (ch == 'X') setSafe(cm, current, px, py, pz, Blocks.LEAVES);
-                    } else {
-                        if (ch == 'X') setSafe(cm, current, px, py, pz, Blocks.AIR);
+                    if (ch == 'F') {
+                        setSafe(cm, current, px, py, pz, Blocks.LEAVES);
+                    } else if (ch == 'X') {
+                        if (getRandomNumber(1, 2) == 1) {
+                            setSafe(cm, current, px, py, pz, Blocks.LEAVES);
+                        }
                     }
                 }
             }
@@ -85,7 +81,6 @@ public class TreeFeature extends PlacedFeature {
     }
 
     public static int getRandomNumber(int min, int max) {
-        Random rand = new Random();
-        return rand.nextInt(max - min + 1) + min;
+        return RAND.nextInt(max - min + 1) + min;
     }
 }

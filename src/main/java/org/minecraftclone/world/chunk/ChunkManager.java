@@ -3,6 +3,7 @@ package org.minecraftclone.world.chunk;
 import org.minecraftclone.world.block.Blocks;
 import org.minecraftclone.world.FastNoiseLite;
 import org.minecraftclone.world.Perlin2D;
+import org.minecraftclone.world.placedfeatures.GroundFoliageFeature;
 import org.minecraftclone.world.placedfeatures.TreeFeature;
 
 import java.util.HashMap;
@@ -10,12 +11,15 @@ import java.util.Map;
 
 public class ChunkManager {
     private final Map<Long, Chunk> chunks = new HashMap<>();
-    private final FastNoiseLite noise = new FastNoiseLite();
-    private final Perlin2D foliageNoise = new Perlin2D(54321L);
 
+    private final FastNoiseLite continentalNoise = new FastNoiseLite(1001);
+    private final FastNoiseLite erosionNoise = new FastNoiseLite(2002);
+    private final FastNoiseLite pvNoise = new FastNoiseLite(3003);
+    private final FastNoiseLite shoreNoise = new FastNoiseLite(4004);
 
     // Foliage
     private final TreeFeature treeFeature = new TreeFeature();
+    private final GroundFoliageFeature groundFoliageFeature = new GroundFoliageFeature();
     private final java.util.Map<Long, java.util.ArrayList<PendingBlock>> pending = new java.util.HashMap<>();
     private record PendingBlock(int wx, int wy, int wz, Blocks type) {}
 
@@ -60,23 +64,22 @@ public class ChunkManager {
         //
         //Noise Maps
         //
-        FastNoiseLite baseNoise = new FastNoiseLite();
-        baseNoise.SetNoiseType(FastNoiseLite.NoiseType.OpenSimplex2);
-        baseNoise.SetFrequency(0.005f);
+        continentalNoise.SetNoiseType(FastNoiseLite.NoiseType.OpenSimplex2);
+        continentalNoise.SetFrequency(0.0025f);
 
-        FastNoiseLite mountainNoise = new FastNoiseLite();
-        mountainNoise.SetNoiseType(FastNoiseLite.NoiseType.OpenSimplex2);
-        mountainNoise.SetFrequency(0.005f);
+        erosionNoise.SetNoiseType(FastNoiseLite.NoiseType.OpenSimplex2);
+        erosionNoise.SetFrequency(0.0035f);
 
-        FastNoiseLite mountainMaskNoise = new FastNoiseLite();
-        mountainMaskNoise.SetNoiseType(FastNoiseLite.NoiseType.OpenSimplex2);
-        mountainMaskNoise.SetFrequency(0.002f);
+        pvNoise.SetNoiseType(FastNoiseLite.NoiseType.OpenSimplex2);
+        pvNoise.SetFrequency(0.0045f);
 
-        FastNoiseLite shoreNoise = new FastNoiseLite();
         shoreNoise.SetNoiseType(FastNoiseLite.NoiseType.OpenSimplex2);
-        shoreNoise.SetFrequency(0.05f);
+        shoreNoise.SetFrequency(0.025f);
 
         int seaLevel = 40;
+        int treeHeight = 70;
+        int stoneHeight = 75;
+        int snowHeight = stoneHeight + 45;
         //
         //Base Terrain Noise
         //
@@ -85,26 +88,33 @@ public class ChunkManager {
                 int worldX = c.cx() * Chunk.SIZE + x;
                 int worldZ = c.cz() * Chunk.SIZE + z;
 
-                float base = baseNoise.GetNoise(worldX, worldZ);
-                float mountain = mountainNoise.GetNoise(worldX, worldZ);
-                float mask = mountainMaskNoise.GetNoise(worldX, worldZ);
+                float continental = continentalNoise.GetNoise(worldX, worldZ);
+                float erosion = erosionNoise.GetNoise(worldX, worldZ);
+                float pv = pvNoise.GetNoise(worldX, worldZ);
 
-                float baseHeight = base * 12f + 45f;
+                float baseHeight = sampleContinentalness(continental);
 
-                mountain = Math.abs(mountain);
-                mountain = (float)Math.pow(mountain, 1.8f);
+                float pvShape = samplePeaksValleys(pv);
+                float ruggedness = sampleErosionFactor(erosion);
 
-                mask = (mask + 1f) * 0.5f;
-                mask = Math.max(0f, mask - 0.45f) / 0.55f;
+                // make mountains more likely inland than near coasts
+                float inlandness = Math.max(0f, (continental + 0.15f) / 0.85f);
+                inlandness = Math.min(inlandness, 1f);
 
-                float uplift = mask * 18f;
-                float peakiness = mountain * mask * 22f;
+                // final mountain contribution
+                float mountainHeight = pvShape * ruggedness * inlandness * 85f;
 
-                int height = (int)(baseHeight + uplift + peakiness);
+                int height = (int)(baseHeight + mountainHeight);
 
-                if (height >= seaLevel - 3 && height <= seaLevel + 2) {
-                    height += (int)(shoreNoise.GetNoise(worldX, worldZ) * 2f);
-                }
+                float erosion01 = (erosion + 1f) * 0.5f; // 0..1
+                float shoreStrength = lerp(4f, 1.5f, erosion01);
+                float shore = shoreNoise.GetNoise(worldX, worldZ) * shoreStrength;
+
+                float distFromSea = Math.abs(height - seaLevel);
+                float shoreWeight = 1f - Math.min(distFromSea / 8f, 1f);
+                shoreWeight = shoreWeight * shoreWeight * (3f - 2f * shoreWeight);
+
+                height += (int)(shore * shoreWeight);
 
                 for (int y = 0; y <= height && y < Chunk.HEIGHT; y++) {
                     c.set(x, y, z, Blocks.STONE);
@@ -113,12 +123,16 @@ public class ChunkManager {
         }
 
         //
-        //Surface Layer
+        // Surface Layer
         //
         for (int x = 0; x < Chunk.SIZE; x++) {
             for (int z = 0; z < Chunk.SIZE; z++) {
                 boolean foundSurface = false;
-                int dirtLeft = 3;
+                int fillerLeft = 0;
+                Blocks fillerBlock = Blocks.STONE;
+
+                int worldX = c.cx() * Chunk.SIZE + x;
+                int worldZ = c.cz() * Chunk.SIZE + z;
 
                 for (int y = Chunk.HEIGHT - 1; y >= 0; y--) {
                     Blocks block = c.get(x, y, z);
@@ -126,11 +140,53 @@ public class ChunkManager {
                     if (block == Blocks.AIR || block == Blocks.WATER) continue;
 
                     if (!foundSurface) {
-                        c.set(x, y, z, Blocks.GRASS);
+                        float stone = rand01(worldX, worldZ, 1337);
+                        float snow = rand01(worldX, worldZ, 7647);
+
+                        Blocks topBlock;
+
+                        if (y > snowHeight) {
+                            topBlock = Blocks.SNOW;
+                            fillerBlock = Blocks.STONE;
+                            fillerLeft = 0;
+
+                        } else if (y > snowHeight - 6 && snow > 0.75f) {
+                            topBlock = Blocks.SNOW;
+                            fillerBlock = Blocks.STONE;
+                            fillerLeft = 0;
+
+                        } else if (y > snowHeight - 3 && snow > 0.15f) {
+                            topBlock = Blocks.SNOW;
+                            fillerBlock = Blocks.STONE;
+                            fillerLeft = 0;
+
+                        } else if (y > stoneHeight - 6 && stone > 0.75f) {
+                            topBlock = Blocks.STONE;
+                            fillerBlock = Blocks.STONE;
+                            fillerLeft = 0;
+
+                        } else if (y > stoneHeight - 3 && stone > 0.15f) {
+                            topBlock = Blocks.STONE;
+                            fillerBlock = Blocks.STONE;
+                            fillerLeft = 0;
+
+                        } else if (y > stoneHeight) {
+                            topBlock = Blocks.STONE;
+                            fillerBlock = Blocks.STONE;
+                            fillerLeft = 0;
+
+                        } else {
+                            topBlock = Blocks.GRASS;
+                            fillerBlock = Blocks.DIRT;
+                            fillerLeft = 3;
+                        }
+
+                        c.set(x, y, z, topBlock);
                         foundSurface = true;
-                    } else if (dirtLeft > 0) {
-                        c.set(x, y, z, Blocks.DIRT);
-                        dirtLeft--;
+
+                    } else if (fillerLeft > 0) {
+                        c.set(x, y, z, fillerBlock);
+                        fillerLeft--;
                     } else {
                         c.set(x, y, z, Blocks.STONE);
                     }
@@ -149,6 +205,7 @@ public class ChunkManager {
                         c.set(x, y, z, Blocks.WATER);
                     }else if (c.get(x, y, z) == Blocks.GRASS){
                         c.set(x, y, z, Blocks.SAND);
+                        c.set(x, y - 1, z, Blocks.SAND);
                     }
                 }
             }
@@ -161,6 +218,7 @@ public class ChunkManager {
             for (int z = 0; z < Chunk.SIZE; z++) {
                 int worldX = c.cx() * Chunk.SIZE + x;
                 int worldZ = c.cz() * Chunk.SIZE + z;
+                float r = rand01(worldX, worldZ, 1337);
 
                 int surfaceY = -1;
                 for (int y = Chunk.HEIGHT - 1; y >= 0; y--) {
@@ -168,19 +226,68 @@ public class ChunkManager {
                         surfaceY = y;
                         break;
                     }
+                    if(c.get(x, y, z) == Blocks.SAND
+                            && c.get(x, y + 1, z) == Blocks.AIR
+                            && (c.get(x + 1, y - 1, z) == Blocks.WATER
+                            || c.get(x, y - 1, z + 1) == Blocks.WATER)){
+
+                        c.set(x, y + 1, z, Blocks.REEDS);
+                        if (r < 0.75){
+                            c.set(x, y + 2, z, Blocks.REEDS);
+                            if (r < 0.5){
+                                c.set(x, y + 3, z, Blocks.REEDS);
+                            }
+
+                        }
+
+                    }
                 }
 
                 if (surfaceY == -1 || surfaceY < seaLevel) continue;
 
-                float r = rand01(worldX, worldZ, 1337);
-                if (r < 0.005f) {
+
+                if (r < 0.005f && surfaceY < treeHeight) {
                     treeFeature.place(this, c, worldX, surfaceY + 1, worldZ);
+                }
+                if (r < 0.25f && surfaceY < treeHeight + 2){
+                    groundFoliageFeature.place(this, c, worldX, surfaceY + 1, worldZ);
                 }
             }
         }
 
         c.clearDirty();
     }
+
+    private float sampleContinentalness(float n) {
+        if (n <= -0.6f) return lerp(18f, 28f, (n + 1.0f) / 0.4f);   // deep ocean -> ocean
+        if (n <= -0.2f) return lerp(28f, 40f, (n + 0.6f) / 0.4f);   // ocean -> coast
+        if (n <=  0.2f) return lerp(40f, 52f, (n + 0.2f) / 0.4f);   // coast -> plains
+        if (n <=  0.55f) return lerp(52f, 68f, (n - 0.2f) / 0.35f); // inland hills
+        return lerp(68f, 88f, (n - 0.55f) / 0.45f);                 // high inland
+    }
+
+    private float samplePeaksValleys(float pv) {
+        float ridged = 1f - Math.abs(pv);
+        float smooth = (pv + 1f) * 0.5f;
+
+        float pvShape = ridged * 0.8f + smooth * 0.2f;
+        pvShape = (float)Math.pow(pvShape, 1.35f);
+
+        if (pvShape > 0.78f) {
+            pvShape = 0.78f + (pvShape - 0.78f) * 0.4f;
+        }
+        return pvShape;
+    }
+
+    private float sampleErosionFactor(float erosion) {
+        float e = (erosion + 1f) * 0.5f; // 0..1
+        return 1f - e;                   // low erosion = strong mountains
+    }
+
+    private float lerp(float a, float b, float t) {
+        return a + (b - a) * t;
+    }
+
     public void setBlockIfLoaded(int wx, int wy, int wz, Blocks type) {
         int cx = floorDiv(wx, Chunk.SIZE);
         int cz = floorDiv(wz, Chunk.SIZE);
@@ -194,18 +301,6 @@ public class ChunkManager {
         c.set(lx, wy, lz, type);
     }
 
-    // Global block lookup (handles chunk boundaries)
-    public Blocks getBlock(int wx, int wy, int wz) {
-        int cx = floorDiv(wx, Chunk.SIZE);
-        int cz = floorDiv(wz, Chunk.SIZE);
-
-        int lx = mod(wx, Chunk.SIZE);
-        int lz = mod(wz, Chunk.SIZE);
-
-        Chunk c = getOrCreate(cx, cz);
-        return c.get(lx, wy, lz);
-    }
-
     private static int floorDiv(int a, int b) {
         int r = a / b;
         if ((a ^ b) < 0 && (r * b != a)) r--;
@@ -216,10 +311,6 @@ public class ChunkManager {
         int m = a % b;
         if (m < 0) m += b;
         return m;
-    }
-
-    public Iterable<Chunk> loadedChunks() {
-        return chunks.values();
     }
 
     //Infinite Chunk Rendering

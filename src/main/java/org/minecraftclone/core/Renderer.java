@@ -27,7 +27,7 @@ public class Renderer {
     private ChunkManager chunkManager;
 
     private Map<Long, ChunkRenderData> chunkMeshes = new HashMap<>();
-    private static final int VIEW_DISTANCE = 12;   // chunks
+    private static final int VIEW_DISTANCE = 10;   // chunks
     private int frameCounter = 0;
 
     private int fps;
@@ -97,6 +97,8 @@ public class Renderer {
 
     public void beginFrame(Window window) {
 
+        var chunks = chunkManager.loadedChunksSnapshot();
+
         double now = glfwGetTime();
         frames++;
 
@@ -147,7 +149,9 @@ public class Renderer {
         // ---- PASS 1: SOLIDS ----
         glDepthMask(true);
 
-        for (Chunk c : chunkManager.loadedChunksSnapshot()) {
+        for (Chunk c : chunks) {
+            if (!shouldRenderChunk(c)) continue;
+
             long key = new ChunkPos(c.cx(), c.cz()).key();
             ChunkRenderData rd = chunkMeshes.get(key);
             if (rd == null || rd.solid == null) continue;
@@ -162,7 +166,9 @@ public class Renderer {
         // ---- PASS 2: WATER (transparent) ----
         glDepthMask(false);
 
-        for (Chunk c : chunkManager.loadedChunksSnapshot()) {
+        for (Chunk c : chunks) {
+            if (!shouldRenderChunk(c)) continue;
+
             long key = new ChunkPos(c.cx(), c.cz()).key();
             ChunkRenderData rd = chunkMeshes.get(key);
             if (rd == null || rd.water == null) continue;
@@ -293,5 +299,35 @@ public class Renderer {
         glMatrixMode(GL_MODELVIEW);
 
         MemoryUtil.memFree(buffer);
+    }
+
+    private boolean shouldRenderChunk(Chunk c) {
+        float chunkCenterX = c.cx() * Chunk.SIZE + Chunk.SIZE * 0.5f;
+        float chunkCenterZ = c.cz() * Chunk.SIZE + Chunk.SIZE * 0.5f;
+
+        float dx = chunkCenterX - camera.position.x;
+        float dz = chunkCenterZ - camera.position.z;
+
+        // distance cull
+        float maxDist = VIEW_DISTANCE * Chunk.SIZE;
+        float distSq = dx * dx + dz * dz;
+        if (distSq > maxDist * maxDist) return false;
+
+        // horizontal forward vector only
+        var forward = camera.getForward();
+        float fx = forward.x;
+        float fz = forward.z;
+
+        float lenSq = fx * fx + fz * fz;
+        if (lenSq < 0.0001f) return true; // looking almost straight up/down, don't cull by facing
+
+        float invLen = (float)(1.0 / Math.sqrt(lenSq));
+        fx *= invLen;
+        fz *= invLen;
+
+        float dot = dx * fx + dz * fz;
+
+        // margin so edge chunks stay visible
+        return dot > -Chunk.SIZE * 2f;
     }
 }

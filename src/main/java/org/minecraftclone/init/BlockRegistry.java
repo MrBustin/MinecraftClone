@@ -81,6 +81,20 @@ public class BlockRegistry {
                 true,
                 (block, face) -> tile(4, 0)
         ));
+
+        register(Blocks.SNOW, new BlockDefinition(
+                BlockType.CUBE,
+                false,
+                true,
+                (block, face) -> tile(7, 0)
+        ));
+
+        register(Blocks.REEDS, new BlockDefinition(
+                BlockType.CROSS,
+                true,
+                false,
+                (block, face) -> tile(4, 1)
+        ));
     }
 
     private static void register(Blocks block, BlockDefinition def) {
