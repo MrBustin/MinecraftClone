@@ -16,7 +16,7 @@ public final class Mesh {
      */
     public Mesh(float[] data) {
         // data layout: x y z u v  x y z u v  ...
-        this.vertexCount = data.length / 5;
+        this.vertexCount = data.length / 6;
 
         vao = glGenVertexArrays();
         vbo = glGenBuffers();
@@ -28,9 +28,9 @@ public final class Mesh {
         fb.put(data).flip();
         glBufferData(GL_ARRAY_BUFFER, fb, GL_STATIC_DRAW);
         MemoryUtil.memFree(fb);
-        glPolygonMode(GL_FRONT_AND_BACK, GL_FOG_MODE);
+        //glPolygonMode(GL_FRONT_AND_BACK, GL_FOG_MODE);
 
-        int stride = 5 * Float.BYTES;
+        int stride = 6 * Float.BYTES;
 
         // location = 0 : vec3 position (x,y,z)
         glVertexAttribPointer(0, 3, GL_FLOAT, false, stride, 0);
@@ -39,6 +39,9 @@ public final class Mesh {
         // location = 1 : vec2 uv (u,v) starts after 3 floats
         glVertexAttribPointer(1, 2, GL_FLOAT, false, stride, 3L * Float.BYTES);
         glEnableVertexAttribArray(1);
+
+        glVertexAttribPointer(2, 1, GL_FLOAT, false, stride, 5L * Float.BYTES);
+        glEnableVertexAttribArray(2);
 
         glBindBuffer(GL_ARRAY_BUFFER, 0);
         glBindVertexArray(0);

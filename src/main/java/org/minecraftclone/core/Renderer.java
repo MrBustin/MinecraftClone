@@ -40,12 +40,15 @@ public class Renderer {
         #version 330 core
         layout (location = 0) in vec3 aPos;
         layout (location = 1) in vec2 aUV;
+        layout(location = 2) in float aShade;
 
         uniform mat4 uMVP;
         out vec2 vUV;
+        out float vShade;
 
         void main() {
             vUV = aUV;
+            vShade = aShade;
             gl_Position = uMVP * vec4(aPos, 1.0);
         }
         """;
@@ -53,16 +56,17 @@ public class Renderer {
     private static final String FRAG = """
         #version 330 core
         in vec2 vUV;
+        in float vShade;
         out vec4 FragColor;
-
+    
         uniform sampler2D uTex;
-
+    
         void main() {
             vec4 c = texture(uTex, vUV);
             if (c.a < 0.5) discard;
-            FragColor = c;
+            FragColor = vec4(c.rgb * vShade, c.a);
         }
-        """;
+    """;
 
     private static class ChunkRenderData {
         Mesh solid;

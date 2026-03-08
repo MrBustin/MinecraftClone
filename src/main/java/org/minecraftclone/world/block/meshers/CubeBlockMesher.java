@@ -16,29 +16,41 @@ public final class CubeBlockMesher implements BlockMesher {
         Blocks nTop    = ctx.world().getBlockForMeshing(ctx.worldX(), ctx.y() + 1, ctx.worldZ());
         Blocks nBottom = ctx.world().getBlockForMeshing(ctx.worldX(), ctx.y() - 1, ctx.worldZ());
 
+        float shadeTop = MeshWriter.SHADE_TOP;
+        float shadeFrontBack = MeshWriter.SHADE_FRONT_BACK;
+        float shadeLeftRight = MeshWriter.SHADE_LEFT_RIGHT;
+        float shadeBottom = MeshWriter.SHADE_BOTTOM;
+
+        if (self == Blocks.WATER) {
+            shadeTop = 0.8f;
+            shadeFrontBack = 0.95f;
+            shadeLeftRight = 0.9f;
+            shadeBottom = 0.8f;
+        }
+
         if (isFaceVisible(self, nFront)) {
             UVRect uv = ctx.definition().textures().get(self, Face.FRONT);
-            MeshWriter.addFront(ctx.target(), ctx.x(), ctx.y(), ctx.z(), uv);
+            MeshWriter.addFront(ctx.target(), ctx.x(), ctx.y(), ctx.z(), uv, shadeFrontBack);
         }
         if (isFaceVisible(self, nBack)) {
             UVRect uv = ctx.definition().textures().get(self, Face.BACK);
-            MeshWriter.addBack(ctx.target(), ctx.x(), ctx.y(), ctx.z(), uv);
+            MeshWriter.addBack(ctx.target(), ctx.x(), ctx.y(), ctx.z(), uv, shadeFrontBack);
         }
         if (isFaceVisible(self, nLeft)) {
             UVRect uv = ctx.definition().textures().get(self, Face.LEFT);
-            MeshWriter.addLeft(ctx.target(), ctx.x(), ctx.y(), ctx.z(), uv);
+            MeshWriter.addLeft(ctx.target(), ctx.x(), ctx.y(), ctx.z(), uv, shadeLeftRight);
         }
         if (isFaceVisible(self, nRight)) {
             UVRect uv = ctx.definition().textures().get(self, Face.RIGHT);
-            MeshWriter.addRight(ctx.target(), ctx.x(), ctx.y(), ctx.z(), uv);
+            MeshWriter.addRight(ctx.target(), ctx.x(), ctx.y(), ctx.z(), uv, shadeLeftRight);
         }
         if (isFaceVisible(self, nTop)) {
             UVRect uv = ctx.definition().textures().get(self, Face.TOP);
-            MeshWriter.addTop(ctx.target(), ctx.x(), ctx.y(), ctx.z(), uv);
+            MeshWriter.addTop(ctx.target(), ctx.x(), ctx.y(), ctx.z(), uv, shadeTop);
         }
         if (isFaceVisible(self, nBottom)) {
             UVRect uv = ctx.definition().textures().get(self, Face.BOTTOM);
-            MeshWriter.addBottom(ctx.target(), ctx.x(), ctx.y(), ctx.z(), uv);
+            MeshWriter.addBottom(ctx.target(), ctx.x(), ctx.y(), ctx.z(), uv, shadeBottom);
         }
     }
 

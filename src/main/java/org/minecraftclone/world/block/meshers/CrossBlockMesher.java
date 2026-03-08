@@ -10,6 +10,6 @@ public final class CrossBlockMesher implements BlockMesher {
     @Override
     public void build(BlockMeshContext ctx) {
         UVRect uv = ctx.definition().textures().get(ctx.block(), Face.FRONT);
-        MeshWriter.addCrossPlant(ctx.target(), ctx.x(), ctx.y(), ctx.z(), uv);
+        MeshWriter.addCrossPlant(ctx.target(), ctx.x(), ctx.y(), ctx.z(), uv, 1.0f);
     }
 }
