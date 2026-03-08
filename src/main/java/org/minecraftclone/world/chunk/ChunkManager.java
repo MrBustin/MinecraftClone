@@ -23,6 +23,22 @@ public class ChunkManager {
     private final java.util.Map<Long, java.util.ArrayList<PendingBlock>> pending = new java.util.HashMap<>();
     private record PendingBlock(int wx, int wy, int wz, Blocks type) {}
 
+    public ChunkManager(){
+        //
+        //Noise Maps
+        //
+        continentalNoise.SetNoiseType(FastNoiseLite.NoiseType.OpenSimplex2);
+        continentalNoise.SetFrequency(0.0025f);
+
+        erosionNoise.SetNoiseType(FastNoiseLite.NoiseType.OpenSimplex2);
+        erosionNoise.SetFrequency(0.0035f);
+
+        pvNoise.SetNoiseType(FastNoiseLite.NoiseType.OpenSimplex2);
+        pvNoise.SetFrequency(0.0045f);
+
+        shoreNoise.SetNoiseType(FastNoiseLite.NoiseType.OpenSimplex2);
+        shoreNoise.SetFrequency(0.025f);
+    }
     public Chunk getOrCreate(int cx, int cz) {
         long key = new ChunkPos(cx, cz).key();
         return chunks.computeIfAbsent(key, k -> {
@@ -61,21 +77,6 @@ public class ChunkManager {
     }
 
     private void generateTerrain(Chunk c) {
-        //
-        //Noise Maps
-        //
-        continentalNoise.SetNoiseType(FastNoiseLite.NoiseType.OpenSimplex2);
-        continentalNoise.SetFrequency(0.0025f);
-
-        erosionNoise.SetNoiseType(FastNoiseLite.NoiseType.OpenSimplex2);
-        erosionNoise.SetFrequency(0.0035f);
-
-        pvNoise.SetNoiseType(FastNoiseLite.NoiseType.OpenSimplex2);
-        pvNoise.SetFrequency(0.0045f);
-
-        shoreNoise.SetNoiseType(FastNoiseLite.NoiseType.OpenSimplex2);
-        shoreNoise.SetFrequency(0.025f);
-
         int seaLevel = 40;
         int treeHeight = 70;
         int stoneHeight = 75;
