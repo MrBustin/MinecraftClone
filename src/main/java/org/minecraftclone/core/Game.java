@@ -76,6 +76,7 @@ public class Game {
             boolean right    = glfwGetKey(window.handle(), GLFW_KEY_D) == GLFW_PRESS;
 
             renderer.getCamera().processKeyboard(forward, backward, up, down, left, right, dt);
+            renderer.getChunkManager().tickEntities();
 
             if (glfwGetKey(window.handle(), GLFW_KEY_ESCAPE) == GLFW_PRESS) {
                 glfwSetWindowShouldClose(window.handle(), true);

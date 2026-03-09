@@ -1,5 +1,6 @@
 package org.minecraftclone.world.chunk;
 
+import org.minecraftclone.entity.Entity;
 import org.minecraftclone.world.FastNoiseLite;
 import org.minecraftclone.world.block.Blocks;
 import org.minecraftclone.world.placedfeatures.GroundFoliageFeature;
@@ -19,6 +20,7 @@ public class ChunkManager {
 
     private final Map<Long, Chunk> chunks = new HashMap<>();
     private final Map<Long, ArrayList<PendingBlock>> pending = new HashMap<>();
+    private final List<Entity> entities = new ArrayList<>();
 
     private record PendingBlock(int wx, int wy, int wz, Blocks type) {}
 
@@ -469,6 +471,27 @@ public class ChunkManager {
 
         return unloadedKeys;
     }
+
+    // =========================================================
+    // Entities
+    // =========================================================
+
+    public void addEntity(Entity entity) {
+        entities.add(entity);
+    }
+
+    public void tickEntities() {
+        for (Entity entity : entities) {
+            entity.tick();
+        }
+
+        entities.removeIf(Entity::isRemoved);
+    }
+
+    public List<Entity> getEntities() {
+        return entities;
+    }
+
 
     // =========================================================
     // Dirty marking

@@ -5,6 +5,9 @@ import org.lwjgl.glfw.GLFWVidMode;
 import org.lwjgl.opengl.GL;
 import org.lwjgl.stb.STBEasyFont;
 import org.lwjgl.system.MemoryUtil;
+import org.minecraftclone.entity.Entity;
+import org.minecraftclone.entity.LivingEntity;
+import org.minecraftclone.entity.TestEntity;
 import org.minecraftclone.gfx.*;
 import org.minecraftclone.world.*;
 import org.minecraftclone.world.block.Blocks;
@@ -67,6 +70,10 @@ public class Renderer {
             FragColor = vec4(c.rgb * vShade, c.a);
         }
     """;
+
+    public ChunkManager getChunkManager() {
+        return chunkManager;
+    }
 
     private static class ChunkRenderData {
         Mesh solid;
@@ -186,6 +193,18 @@ public class Renderer {
 
         glDepthMask(true);
 
+        for (Entity e : chunkManager.getEntities()) {
+            if (e instanceof LivingEntity living) {
+                drawEntityModel(
+                        living.getModel().getMesh(),
+                        vp,
+                        (float) living.getX(),
+                        (float) living.getY(),
+                        (float) living.getZ()
+                );
+            }
+        }
+
         shader.unbind();
         renderFPS(window);
     }
@@ -252,7 +271,8 @@ public class Renderer {
         int py = hit.y() + hit.ny();
         int pz = hit.z() + hit.nz();
 
-        chunkManager.setBlock(px, py, pz, Blocks.TALL_GRASS);
+//        chunkManager.setBlock(px, py, pz, Blocks.TALL_GRASS);
+        chunkManager.addEntity(new TestEntity(chunkManager, px +0.5, py, pz + 0.5));
     }
 
     private void renderFPS(Window window) {
@@ -333,5 +353,13 @@ public class Renderer {
 
         // margin so edge chunks stay visible
         return dot > -Chunk.SIZE * 2f;
+    }
+
+    public void drawEntityModel(Mesh mesh, Matrix4f vp, float x, float y, float z) {
+        Matrix4f modelMatrix = new Matrix4f().translate(x, y, z);
+        Matrix4f mvp = new Matrix4f(vp).mul(modelMatrix);
+
+        shader.setMat4("uMVP", mvp);
+        mesh.draw();
     }
 }
