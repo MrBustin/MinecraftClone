@@ -27,14 +27,14 @@ public class ChunkManager {
     // =========================================================
 
     private static final int SEA_LEVEL = 40;
-    private static final int TREE_HEIGHT_LIMIT = 70;
-    private static final int STONE_HEIGHT = 75;
-    private static final int SNOW_HEIGHT = STONE_HEIGHT + 45;
+    private static final int TREE_HEIGHT_LIMIT = 80;
+    private static final int STONE_HEIGHT = 85;
+    private static final int SNOW_HEIGHT = STONE_HEIGHT + 35;
 
     private static final float CONTINENTAL_FREQ = 0.0025f;
     private static final float EROSION_FREQ = 0.0035f;
     private static final float PV_FREQ = 0.0045f;
-    private static final float SHORE_FREQ = 0.025f;
+    private static final float SHORE_FREQ = 0.018f;
 
     private static final int CONTINENTAL_SEED = 1001;
     private static final int EROSION_SEED = 2002;
@@ -227,17 +227,75 @@ public class ChunkManager {
     }
 
     private void placeWaterAndBeaches(Chunk chunk) {
+        final int beachMinY = SEA_LEVEL - 2;
+        final int beachMaxY = SEA_LEVEL + 3;
+
         for (int x = 0; x < Chunk.SIZE; x++) {
             for (int z = 0; z < Chunk.SIZE; z++) {
-                for (int y = 0; y < SEA_LEVEL; y++) {
-                    Blocks current = chunk.get(x, y, z);
+                int worldX = chunk.cx() * Chunk.SIZE + x;
+                int worldZ = chunk.cz() * Chunk.SIZE + z;
 
-                    if (current == Blocks.AIR) {
+                int surfaceY = -1;
+
+                // Find top solid block in this column
+                for (int y = Chunk.HEIGHT - 1; y >= 0; y--) {
+                    Blocks block = chunk.get(x, y, z);
+                    if (block != Blocks.AIR && block != Blocks.WATER) {
+                        surfaceY = y;
+                        break;
+                    }
+                }
+
+                // Fill water up to sea level
+                for (int y = 0; y < SEA_LEVEL; y++) {
+                    if (chunk.get(x, y, z) == Blocks.AIR) {
                         chunk.set(x, y, z, Blocks.WATER);
-                    } else if (current == Blocks.GRASS) {
+                    }
+                }
+
+                if (surfaceY == -1) continue;
+
+                float shore = shoreNoise.GetNoise(worldX, worldZ);
+
+                // Vary sand depth with shore noise
+                int sandDepth = 3 + (int) ((shore + 1f) * 0.5f * 3f); // 3..6
+
+                // Underwater columns: make full seafloor sand
+                if (surfaceY < SEA_LEVEL) {
+                    Blocks top = chunk.get(x, surfaceY, z);
+                    if (top != Blocks.AIR && top != Blocks.WATER) {
+                        chunk.set(x, surfaceY, z, Blocks.SAND);
+                    }
+
+                    for (int d = 1; d <= sandDepth; d++) {
+                        int y = surfaceY - d;
+                        if (y < 0) break;
+
+                        Blocks below = chunk.get(x, y, z);
+                        if (below == Blocks.AIR || below == Blocks.WATER) break;
+
                         chunk.set(x, y, z, Blocks.SAND);
-                        if (y - 1 >= 0) {
-                            chunk.set(x, y - 1, z, Blocks.SAND);
+                    }
+
+                    continue;
+                }
+
+                // Shoreline beaches slightly above/below sea level
+                if (surfaceY >= beachMinY && surfaceY <= beachMaxY) {
+                    Blocks top = chunk.get(x, surfaceY, z);
+                    if (top == Blocks.GRASS || top == Blocks.DIRT || top == Blocks.STONE) {
+                        chunk.set(x, surfaceY, z, Blocks.SAND);
+                    }
+
+                    for (int d = 1; d <= sandDepth; d++) {
+                        int y = surfaceY - d;
+                        if (y < 0) break;
+
+                        Blocks below = chunk.get(x, y, z);
+                        if (below == Blocks.AIR || below == Blocks.WATER) break;
+
+                        if (below == Blocks.DIRT || below == Blocks.GRASS || below == Blocks.STONE) {
+                            chunk.set(x, y, z, Blocks.SAND);
                         }
                     }
                 }
@@ -277,14 +335,21 @@ public class ChunkManager {
         float pvShape = samplePeaksValleys(pv);
         float ruggedness = sampleErosionFactor(erosion);
 
-        float inlandness = Math.max(0f, (continental + 0.15f) / 0.85f);
+        float inlandness = Math.max(0f, (continental + 0.15f) / 0.65f);
         inlandness = Math.min(inlandness, 1f);
 
         float mountainHeight = pvShape * ruggedness * inlandness * 85f;
         int height = (int) (baseHeight + mountainHeight);
 
-        float erosion01 = (erosion + 1f) * 0.5f;
-        float shoreStrength = lerp(4f, 1.5f, erosion01);
+        if (height < SEA_LEVEL) {
+            float seaFloorNoise = shoreNoise.GetNoise(worldX, worldZ);
+            float depthBelowSea = SEA_LEVEL - height;
+            float seaFloorWeight = Math.min(depthBelowSea / 12f, 1f);
+            height += (int) (seaFloorNoise * 3f * seaFloorWeight);
+        }
+
+        float erosion01 = (erosion + 1f) * 0.25f;
+        float shoreStrength = lerp(3f, 1.5f, erosion01);
         float shore = shoreNoise.GetNoise(worldX, worldZ) * shoreStrength;
 
         float distFromSea = Math.abs(height - SEA_LEVEL);
@@ -372,11 +437,6 @@ public class ChunkManager {
     // Chunk loading / unloading
     // =========================================================
 
-    public boolean unload(int cx, int cz) {
-        long key = new ChunkPos(cx, cz).key();
-        return chunks.remove(key) != null;
-    }
-
     public Collection<Chunk> loadedChunksSnapshot() {
         return new ArrayList<>(chunks.values());
     }
@@ -444,26 +504,20 @@ public class ChunkManager {
         if (n <= -0.2f) return lerp(28f, 40f, (n + 0.6f) / 0.4f);
         if (n <= 0.2f) return lerp(40f, 52f, (n + 0.2f) / 0.4f);
         if (n <= 0.55f) return lerp(52f, 68f, (n - 0.2f) / 0.35f);
-        return lerp(68f, 88f, (n - 0.55f) / 0.45f);
+        return lerp(68f, 74f, (n - 0.55f) / 0.45f);
     }
 
     private float samplePeaksValleys(float pv) {
-        float ridged = 1f - Math.abs(pv);
-        float smooth = (pv + 1f) * 0.5f;
-
-        float pvShape = ridged * 0.8f + smooth * 0.2f;
-        pvShape = (float) Math.pow(pvShape, 1.35f);
-
-        if (pvShape > 0.78f) {
-            pvShape = 0.78f + (pvShape - 0.78f) * 0.4f;
-        }
-
-        return pvShape;
+        float ridged = 1f - Math.abs(pv);   // 0..1, highest near center
+        ridged = 1f - ridged;               // flip so high values are rarer
+        ridged = Math.max(0f, ridged - 0.35f) / 0.65f; // threshold out small bumps
+        return ridged * ridged;             // strongly bias toward low values
     }
 
     private float sampleErosionFactor(float erosion) {
         float e = (erosion + 1f) * 0.5f;
-        return 1f - e;
+        float rugged = 1f - e;
+        return rugged * rugged;
     }
 
     private float lerp(float a, float b, float t) {
