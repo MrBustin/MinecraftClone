@@ -463,9 +463,18 @@ public class ChunkManager {
             int distSq = dx * dx + dz * dz;
 
             if (distSq > maxDistSq) {
-                long key = new ChunkPos(chunk.cx(), chunk.cz()).key();
+                int unloadCx = chunk.cx();
+                int unloadCz = chunk.cz();
+
+                long key = new ChunkPos(unloadCx, unloadCz).key();
                 chunks.remove(key);
                 unloadedKeys.add(key);
+
+                for (Entity entity : entities) {
+                    if (entity.getChunkX() == unloadCx && entity.getChunkZ() == unloadCz) {
+                        entity.remove();
+                    }
+                }
             }
         }
 

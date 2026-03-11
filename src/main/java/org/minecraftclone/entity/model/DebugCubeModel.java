@@ -1,68 +1,16 @@
 package org.minecraftclone.entity.model;
 
+import org.minecraftclone.gfx.Texture;
+
 public class DebugCubeModel extends EntityModel {
+    private static final Texture texture = new Texture("/textures/entity/debug_cube.png");
 
     public DebugCubeModel() {
-        super(makeDebugCube());
-    }
+        super(
+                new ModelBuilder()
+                        .box(-0.3f, 0.0f, -0.3f, 0.6f, 0.6f, 0.6f,  new UV(0f, 0f, 1f, 1f))
+                        .build(), texture
 
-    private static float[] makeDebugCube() {
-        float s = 0.3f;
-
-        return new float[] {
-                // front
-                -s, 0,  s, 0, 0, 1f,
-                s, 0,  s, 1, 0, 1f,
-                s, 0.6f, s, 1, 1, 1f,
-
-                -s, 0,  s, 0, 0, 1f,
-                s, 0.6f, s, 1, 1, 1f,
-                -s, 0.6f, s, 0, 1, 1f,
-
-                // back
-                s, 0, -s, 0, 0, 1f,
-                -s, 0, -s, 1, 0, 1f,
-                -s, 0.6f,-s, 1, 1, 1f,
-
-                s, 0, -s, 0, 0, 1f,
-                -s, 0.6f,-s, 1, 1, 1f,
-                s, 0.6f,-s, 0, 1, 1f,
-
-                // left
-                -s, 0, -s, 0, 0, 0.85f,
-                -s, 0,  s, 1, 0, 0.85f,
-                -s, 0.6f, s, 1, 1, 0.85f,
-
-                -s, 0, -s, 0, 0, 0.85f,
-                -s, 0.6f, s, 1, 1, 0.85f,
-                -s, 0.6f,-s, 0, 1, 0.85f,
-
-                // right
-                s, 0,  s, 0, 0, 0.85f,
-                s, 0, -s, 1, 0, 0.85f,
-                s, 0.6f,-s, 1, 1, 0.85f,
-
-                s, 0,  s, 0, 0, 0.85f,
-                s, 0.6f,-s, 1, 1, 0.85f,
-                s, 0.6f, s, 0, 1, 0.85f,
-
-                // top
-                -s, 0.6f, s, 0, 0, 1.15f,
-                s, 0.6f, s, 1, 0, 1.15f,
-                s, 0.6f,-s, 1, 1, 1.15f,
-
-                -s, 0.6f, s, 0, 0, 1.15f,
-                s, 0.6f,-s, 1, 1, 1.15f,
-                -s, 0.6f,-s, 0, 1, 1.15f,
-
-                // bottom
-                -s, 0, -s, 0, 0, 0.7f,
-                s, 0, -s, 1, 0, 0.7f,
-                s, 0,  s, 1, 1, 0.7f,
-
-                -s, 0, -s, 0, 0, 0.7f,
-                s, 0,  s, 1, 1, 0.7f,
-                -s, 0,  s, 0, 1, 0.7f,
-        };
+        );
     }
 }

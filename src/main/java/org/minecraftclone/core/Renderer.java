@@ -8,6 +8,7 @@ import org.lwjgl.system.MemoryUtil;
 import org.minecraftclone.entity.Entity;
 import org.minecraftclone.entity.LivingEntity;
 import org.minecraftclone.entity.TestEntity;
+import org.minecraftclone.entity.model.EntityModel;
 import org.minecraftclone.gfx.*;
 import org.minecraftclone.world.*;
 import org.minecraftclone.world.block.Blocks;
@@ -196,7 +197,7 @@ public class Renderer {
         for (Entity e : chunkManager.getEntities()) {
             if (e instanceof LivingEntity living) {
                 drawEntityModel(
-                        living.getModel().getMesh(),
+                        living.getModel(),
                         vp,
                         (float) living.getX(),
                         (float) living.getY(),
@@ -355,11 +356,12 @@ public class Renderer {
         return dot > -Chunk.SIZE * 2f;
     }
 
-    public void drawEntityModel(Mesh mesh, Matrix4f vp, float x, float y, float z) {
+    public void drawEntityModel(EntityModel model, Matrix4f vp, float x, float y, float z) {
         Matrix4f modelMatrix = new Matrix4f().translate(x, y, z);
         Matrix4f mvp = new Matrix4f(vp).mul(modelMatrix);
 
+        model.getTexture().bind();
         shader.setMat4("uMVP", mvp);
-        mesh.draw();
+        model.getMesh().draw();
     }
 }

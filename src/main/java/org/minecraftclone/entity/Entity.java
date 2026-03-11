@@ -40,6 +40,18 @@ public abstract class Entity {
         applyDrag();
     }
 
+    public int getChunkX() {
+        return Math.floorDiv((int)Math.floor(x), Chunk.SIZE);
+    }
+
+    public int getChunkZ() {
+        return Math.floorDiv((int)Math.floor(z), Chunk.SIZE);
+    }
+
+    public void remove() {
+        removed = true;
+    }
+
     protected void applyGravity() {
         if (!onGround) {
             vy -= 0.08;
