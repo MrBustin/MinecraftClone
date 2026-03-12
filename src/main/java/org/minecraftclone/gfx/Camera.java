@@ -47,7 +47,7 @@ public class Camera {
     public void processKeyboard(boolean forward, boolean backward, boolean up, boolean down,
                                 boolean left, boolean right, float dt) {
 
-        float speed = 20.5f * dt;
+        float speed = 10.5f * dt;
 
         Vector3f rightVec = new Vector3f(front).cross(up1).normalize();
 

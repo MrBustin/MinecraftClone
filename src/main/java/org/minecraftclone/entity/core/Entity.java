@@ -1,4 +1,4 @@
-package org.minecraftclone.entity;
+package org.minecraftclone.entity.core;
 
 import org.minecraftclone.world.block.Blocks;
 import org.minecraftclone.world.chunk.Chunk;

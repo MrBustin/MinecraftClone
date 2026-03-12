@@ -1,6 +1,6 @@
 package org.minecraftclone.world.chunk;
 
-import org.minecraftclone.entity.Entity;
+import org.minecraftclone.entity.core.Entity;
 import org.minecraftclone.world.FastNoiseLite;
 import org.minecraftclone.world.block.Blocks;
 import org.minecraftclone.world.placedfeatures.GroundFoliageFeature;

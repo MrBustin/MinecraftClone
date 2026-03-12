@@ -1,5 +1,8 @@
 package org.minecraftclone.entity.model;
 
+import org.minecraftclone.entity.core.EntityModel;
+import org.minecraftclone.entity.core.ModelBuilder;
+import org.minecraftclone.entity.core.UV;
 import org.minecraftclone.gfx.Texture;
 
 public class DebugCubeModel extends EntityModel {

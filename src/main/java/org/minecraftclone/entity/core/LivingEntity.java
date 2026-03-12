@@ -1,8 +1,5 @@
-package org.minecraftclone.entity;
+package org.minecraftclone.entity.core;
 
-import org.joml.Matrix4f;
-import org.minecraftclone.core.Renderer;
-import org.minecraftclone.entity.model.EntityModel;
 import org.minecraftclone.world.chunk.ChunkManager;
 
 public abstract class LivingEntity extends Entity{

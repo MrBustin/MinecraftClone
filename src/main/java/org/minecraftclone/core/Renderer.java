@@ -5,10 +5,11 @@ import org.lwjgl.glfw.GLFWVidMode;
 import org.lwjgl.opengl.GL;
 import org.lwjgl.stb.STBEasyFont;
 import org.lwjgl.system.MemoryUtil;
-import org.minecraftclone.entity.Entity;
-import org.minecraftclone.entity.LivingEntity;
+import org.minecraftclone.entity.PigEntity;
+import org.minecraftclone.entity.core.Entity;
+import org.minecraftclone.entity.core.LivingEntity;
 import org.minecraftclone.entity.TestEntity;
-import org.minecraftclone.entity.model.EntityModel;
+import org.minecraftclone.entity.core.EntityModel;
 import org.minecraftclone.gfx.*;
 import org.minecraftclone.world.*;
 import org.minecraftclone.world.block.Blocks;
@@ -273,7 +274,7 @@ public class Renderer {
         int pz = hit.z() + hit.nz();
 
 //        chunkManager.setBlock(px, py, pz, Blocks.TALL_GRASS);
-        chunkManager.addEntity(new TestEntity(chunkManager, px +0.5, py, pz + 0.5));
+        chunkManager.addEntity(new PigEntity(chunkManager, px +0.5, py, pz + 0.5));
     }
 
     private void renderFPS(Window window) {

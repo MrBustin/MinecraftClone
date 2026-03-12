@@ -1,9 +1,10 @@
 package org.minecraftclone.entity;
 
+import org.minecraftclone.entity.core.LivingEntity;
 import org.minecraftclone.entity.model.DebugCubeModel;
 import org.minecraftclone.world.chunk.ChunkManager;
 
-public class TestEntity extends LivingEntity{
+public class TestEntity extends LivingEntity {
 
     private static final DebugCubeModel MODEL = new DebugCubeModel();
 

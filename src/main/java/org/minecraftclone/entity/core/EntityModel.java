@@ -1,7 +1,5 @@
-package org.minecraftclone.entity.model;
+package org.minecraftclone.entity.core;
 
-import org.joml.Matrix4f;
-import org.minecraftclone.core.Renderer;
 import org.minecraftclone.gfx.Mesh;
 import org.minecraftclone.gfx.Texture;
 

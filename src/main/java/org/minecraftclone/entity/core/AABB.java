@@ -1,4 +1,4 @@
-package org.minecraftclone.entity;
+package org.minecraftclone.entity.core;
 
 public class AABB {
     public double minX, minY, minZ;
