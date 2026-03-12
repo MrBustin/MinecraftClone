@@ -35,11 +35,15 @@ public class ChunkManager {
     private static final float EROSION_FREQ = 0.0035f;
     private static final float PV_FREQ = 0.0045f;
     private static final float SHORE_FREQ = 0.018f;
+    private static final float SPAGHETTI_CAVE_FREQ = 0.015f;
+    private static final float CHEESE_CAVE_FREQ = 0.012f;
 
     private static final int CONTINENTAL_SEED = 1001;
     private static final int EROSION_SEED = 2002;
     private static final int PV_SEED = 3003;
     private static final int SHORE_SEED = 4004;
+    private static final int SPAGHETTI_CAVE_SEED = 5005;
+    private static final int CHEESE_CAVE_SEED = 5005;
 
     private static final int SURFACE_STONE_SEED = 1337;
     private static final int SURFACE_SNOW_SEED = 7647;
@@ -53,6 +57,8 @@ public class ChunkManager {
     private final FastNoiseLite erosionNoise = createNoise(EROSION_SEED, EROSION_FREQ);
     private final FastNoiseLite pvNoise = createNoise(PV_SEED, PV_FREQ);
     private final FastNoiseLite shoreNoise = createNoise(SHORE_SEED, SHORE_FREQ);
+    private final FastNoiseLite spaghettiCaveNoise = createNoise(SPAGHETTI_CAVE_SEED, SPAGHETTI_CAVE_FREQ);
+    private final FastNoiseLite cheeseCaveNoise = createNoise(CHEESE_CAVE_SEED, CHEESE_CAVE_FREQ);
 
     // =========================================================
     // Features
@@ -172,6 +178,7 @@ public class ChunkManager {
         generateBaseStone(chunk);
         applySurfaceLayers(chunk);
         placeWaterAndBeaches(chunk);
+        carveCaves(chunk);
         placeFeatures(chunk);
         chunk.clearDirty();
     }
@@ -186,6 +193,29 @@ public class ChunkManager {
 
                 for (int y = 0; y <= height && y < Chunk.HEIGHT; y++) {
                     chunk.set(x, y, z, Blocks.STONE);
+                }
+            }
+        }
+    }
+
+    private void carveCaves(Chunk chunk) {
+        for (int x = 0; x < Chunk.SIZE; x++) {
+            for (int z = 0; z < Chunk.SIZE; z++) {
+                int worldX = chunk.cx() * Chunk.SIZE + x;
+                int worldZ = chunk.cz() * Chunk.SIZE + z;
+
+                int terrainHeight = computeTerrainHeight(worldX, worldZ);
+
+                for (int y = 5; y < Math.min(terrainHeight, Chunk.HEIGHT); y++) {
+                    Blocks block = chunk.get(x, y, z);
+                    if (block != Blocks.STONE) continue;
+
+                    boolean cheese = cheeseCaveNoise.GetNoise(worldX, y, worldZ) > 0.82f;
+                    boolean spaghetti = Math.abs(spaghettiCaveNoise.GetNoise(worldX, y, worldZ)) < 0.015f;
+
+                    if (spaghetti) {
+                        chunk.set(x, y, z, Blocks.AIR);
+                    }
                 }
             }
         }
